@@ -9,8 +9,8 @@ Gloriana Chaverri, Maria Sagot, Jennifer L. Stynoski, Marcelo Araya-Salas, Yimen
 In this study we tested if disc-winged bats (Thyroptera tricolor) produce more contact calls towards more related or more associated group members.
 
 ## Data
-* [Data: associations for 2021](https://github.com/morceglo/Energetics-of-vocal-communication-in-Thyroptera/blob/main/CostCalling_Thtr.XLSX)
-* [Data: associations for 2022](https://github.com/morceglo/Energetics-of-vocal-communication-in-Thyroptera/blob/main/CostCalling_Thtr.XLSX)
+* [Data: associations for 2021](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/associations_2021.csv)
+* [Data: associations for 2022](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/associations_2022.csv)
 * [Data: kinship](https://github.com/morceglo/Energetics-of-vocal-communication-in-Thyroptera/blob/main/CostCalling_Thtr.XLSX)
 * [Data: vocal interactions 2021](https://github.com/morceglo/Energetics-of-vocal-communication-in-Thyroptera/blob/main/CostCalling_Thtr.XLSX)
 * [Data: vocal interactions 2022](https://github.com/morceglo/Energetics-of-vocal-communication-in-Thyroptera/blob/main/CostCalling_Thtr.XLSX)

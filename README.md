@@ -21,7 +21,7 @@ In this study we tested if disc-winged bats (Thyroptera tricolor) produce more c
 
 * [Estimating associations](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/Associations.R)
 * [Estimating kinship](https://github.com/morceglo/Energetics-of-vocal-communication-in-Thyroptera/blob/main/Energetics%20of%20calling%20in%20Thyroptera.R)
-* [Individual differences in calling rates](https://github.com/morceglo/Energetics-of-vocal-communication-in-Thyroptera/blob/main/Energetics%20of%20calling%20in%20Thyroptera.R)
+* [Individual differences in calling rates](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/Individual%20differences%20in%20calling%20rates_negative%20binomial.R)
 * [Kinship and association effects on calling rates](https://github.com/morceglo/Energetics-of-vocal-communication-in-Thyroptera/blob/main/Energetics%20of%20calling%20in%20Thyroptera.R)
 
 ## Status

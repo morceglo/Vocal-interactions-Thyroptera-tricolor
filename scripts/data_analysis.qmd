@@ -1,0 +1,1656 @@
+---
+title: Data analysis
+subtitle: Vocal interactions in Thyroptera tricolor
+author: Marcelo Araya-Salas
+date: "`r Sys.Date()`"
+toc: true
+toc-depth: 3
+toc-location: left
+number-sections: true
+highlight-style: pygments
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    code-copy: true
+    embed-resources: true
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- skyblue box -->
+<div class="alert alert-info">
+
+Data analysis for the paper:
+
+Gloriana Chaverri, Maria Sagot, Jennifer L. Stynoski, Marcelo Araya-Salas, Yimen Araya-Ajoy, Martina Nagy, Mirjam Knörnschild, Silvia Chaves-Ramírez, Nicole Rose, Mariela Sánchez-Chavarría, Yelananie Jiménez-Torres, Deilyn Ulloa-Sanabria, Hellen Solís-Hernández, Gerald G. Carter. In review. Contact-calling rates within groups of disc-winged bats vary by caller but not by the receiver’s identity, kinship, or association. Philosophical Transactions of the Royal Society B.  
+
+</div>
+
+&nbsp; 
+
+
+<!-- this code add line numbers to code blocks -->
+<!-- only works when code folding is not used in yaml (code_folding: show) -->
+
+```{=html}
+<style>
+body
+  { counter-reset: source-line 0; }
+pre.numberSource code
+  { counter-reset: none; }
+</style>
+```
+
+```{r set root directory, echo = FALSE}
+
+# set working directory as project directory or one directory above,
+rootdir <- try(rprojroot::find_rstudio_root_file(), silent = TRUE)
+if (is(rootdir, "try-error")) rootdir <-  ".."
+knitr::opts_knit$set(root.dir = rootdir)
+
+```
+
+```{r add link to github repo, echo = FALSE, results='asis'}
+
+# print link to github repo if any
+if (file.exists("./.git/config")){
+  config <- readLines("./.git/config")
+  url <- grep("url",  config, value = TRUE)
+  url <- gsub("\\turl = |.git$", "", url)[2]
+  cat("\nSource code and data found at [", url, "](", url, ")", sep = "")
+  }
+
+```
+
+```{r setup style, echo = FALSE, message = FALSE, warning=FALSE}
+
+# options to customize chunk outputs
+knitr::opts_chunk$set(
+  class.source = "numberLines lineAnchors", # for code line numbers
+  tidy.opts = list(width.cutoff = 65), 
+  tidy = TRUE,
+  message = FALSE,
+  warning = FALSE
+ )
+
+knitr::opts_knit$set(root.dir = "..")
+
+```
+
+
+# Load packages {.unnumbered .unlisted}
+
+```{r load packages}
+
+# load function from sketchy
+source("https://raw.githubusercontent.com/maRce10/sketchy/main/R/load_packages.R")
+
+# install/ load packages
+sketchy::load_packages(packages = c("igraph", "bipartite", "asnipe", "assortnet", "ggplot2", "ggmap", "ecodist", "igraphdata", "statnet", "RColorBrewer", "tidyverse", "geosphere", "mapproj", "sna", "stringr", "lme4", "glmmTMB", "broom.mixed", "boot", "patchwork", "performance", "MASS"))
+
+```
+
+# Visualize social networks
+
+## Prepare data
+```{r}
+#Using https://dshizuka.github.io/networkanalysis/example_make_sparrow_network.html
+
+
+#Input data
+batdat21=read.csv('./data/raw/associations_2021.csv', header = TRUE, sep = ";", colClasses = c("numeric", "character", "Date", "character", "character", "character","character","character","character","character","character","character","character"))
+batdat22=read.csv('./data/raw/associations_2022.csv', header = TRUE, sep = ";", colClasses = c("numeric", "character", "Date", "character", "character", "character","character","character","character","character","character"))
+
+
+#Add attribute data
+attrib_21 <- read.csv('./data/raw/supp_21.csv', header = TRUE, sep = ";", colClasses = c("character", "character"))
+
+attrib_22 <- read.csv('./data/raw/supp_22.csv', header = TRUE, sep = ";", colClasses = c("character", "character"))
+
+
+#Prepare association data 2021
+batcols=grep("Bat",colnames(batdat21))
+# batcols
+# batdat21[,batcols]
+# gather(batdat21[,batcols])
+bat.ids=unique(gather(batdat21[,batcols])$value)
+# bat.ids
+bat.ids=bat.ids[!is.na(bat.ids)]
+# bat.ids
+bat.ids_df_21 <- data.frame(bat.ids)
+# csv_path  <- 'bats_21.csv'
+# write.csv(bat.ids_df_21, csv_path, row.names = FALSE)
+
+m1_21=apply(batdat21[,batcols], 1, function(x) match(bat.ids,x))
+# m1_21
+
+m1_21[is.na(m1_21)]=0
+m1_21[m1_21>0]=1
+# m1_21
+
+rownames(m1_21)=bat.ids #rows are bat ids
+colnames(m1_21)=paste('group', 1:ncol(m1_21), sep="_") #columns are group IDs (just "group_#")
+# m1_21
+
+# rowSums(m1_21)
+# set.seed(2)
+# png(file="./output/Histogram captures 2021.png", width=600, height=400)
+# par(oma=c(1,1,1,1)) # all sides have 3 lines of space
+# par(mar=c(5,4,4,2) + 0.8)
+# hist(rowSums(m1_21), main="", xlab="Number of observations", ylab="Frequency", cex.lab = 2.5, cex.axis = 1.5)
+# dev.off()
+
+average_n_21 <- mean(rowSums(m1_21)) #average number of times a single bat was observed
+# average_n_21
+
+sd_n_21 <- sd(rowSums(m1_21)) #sd number of times a single bat was observed
+# sd_n_21
+
+average_gs_21 <- mean(colSums(m1_21)) #average group size
+# average_gs_21
+
+sd_gs_21 <- sd(colSums(m1_21)) #sd group size
+# sd_gs_21
+
+
+#Prepare association data 2022
+batcols=grep("Bat",colnames(batdat22))
+# batcols
+# batdat22[,batcols]
+# gather(batdat22[,batcols])
+bat.ids=unique(gather(batdat22[,batcols])$value)
+# bat.ids
+bat.ids=bat.ids[is.na(bat.ids)==F]
+# bat.ids
+bat.ids_df_22 <- data.frame(bat.ids)
+# csv_path  = 'bats_22.csv'
+# write.csv(bat.ids_df_22, csv_path, row.names = FALSE)
+
+m1_22=apply(batdat22[,batcols], 1, function(x) match(bat.ids,x))
+# m1_22
+
+m1_22[is.na(m1_22)]=0
+m1_22[m1_22>0]=1
+# m1_22
+
+rownames(m1_22)=bat.ids #rows are bat ids
+colnames(m1_22)=paste('group', 1:ncol(m1_22), sep="_") #columns are group IDs (just "group_#")
+# m1_22
+
+# rowSums(m1_22)
+# set.seed(2)
+# png(file="./output/Histogram captures 2022.png",
+#     width=600, height=400)
+# par(oma=c(1,1,1,1)) # all sides have 3 lines of space
+# par(mar=c(5,4,4,2) + 0.8)
+# hist (rowSums(m1_22), main="", xlab="Number of observations", ylab="Frequency", cex.lab = 2.5, cex.axis = 1.5)
+# dev.off()
+
+average_n_22 <- mean(rowSums(m1_22)) #average number of times a single bat was observed
+# average_n_22
+
+sd_n_22 <- sd(rowSums(m1_22)) #sd number of times a single bat was observed
+# sd_n_22
+
+average_gs_22 <- mean(colSums(m1_22)) #average group size
+# average_gs_22
+
+sd_gs_22 <- sd(colSums(m1_22)) #average group size
+# sd_gs_22
+```
+
+## Plot networks
+```{r plot networks 2021, message=FALSE}
+#Create adjacency data for associations (2021)
+adj_21=get_network(t(m1_21), data_format="GBI", association_index = "SRI") # the adjacency matrix
+g_21=graph_from_adjacency_matrix(adj_21, "undirected", weighted=T) #the igraph object
+V(g_21)$sex <- factor(attrib_21[match(V(g_21)$name, attrib_21$bat_id), "sex"])
+
+mismatched_names <- setdiff(V(g_21)$name, attrib_21$bat_id) #check for issues
+
+
+#Create adjacency data for associations (2022)
+adj_22=get_network(t(m1_22), data_format="GBI", association_index = "SRI") # the adjacency matrix
+g_22=graph_from_adjacency_matrix(adj_22, "undirected", weighted=T) #the igraph object
+V(g_22)$sex <- factor(attrib_22[match(V(g_22)$name, attrib_22$bat_id), "sex"])
+
+mismatched_names <- setdiff(V(g_22)$name, attrib_22$bat_id) #check for issues
+
+
+#Select individuals for which more than 10 observations were made (not incorporated into adjacency data for associations, above)
+#m2_21=m1_21[which(rowSums(m1_21)>10),]
+#adj_21=get_network(t(m2_21), data_format="GBI","SRI")
+#write.csv(adj_21, "assoc_21.csv", row.names=TRUE)
+#rowSums(m2_21)
+
+#m2_22=m1_22[which(rowSums(m1_22)>10),]
+#adj_22=get_network(t(m2_22), data_format="GBI","SRI")
+#rowSums(m2_22)
+#write.csv(adj_22, "assoc_22.csv", row.names=TRUE)
+#rowSums(m2_22)
+
+
+#Create communities (2021)
+com_21=fastgreedy.community(g_21) #community detection method
+# com_21[[11]]
+
+# Assign community names
+mapping <- c(
+  11,  # Old membership 1 should be corrected to 11
+  8,   # Old membership 2 should be corrected to 8
+  1,   # Old membership 3 should be corrected to 1
+  2,   # Old membership 4 should be corrected to 2
+  6,   # Old membership 5 should be corrected to 6
+  9,   # Old membership 6 should be corrected to 9
+  4,   # Old membership 7 should be corrected to 4
+  10,  # Old membership 8 should be corrected to 10
+  7,   # Old membership 9 should be corrected to 7
+  5,   # Old membership 10 should be corrected to 5
+  3    # Old membership 11 should be corrected to 3
+)
+
+corrected_memberships <- mapping[com_21$membership]
+
+com_21$membership <- corrected_memberships
+
+community_assignments <- com_21$membership
+
+color_mapping <- c(
+  "female" = "slateblue",
+  "male" = "gold",
+  "unknown" = "gray"
+)
+node_sex <- V(g_21)$sex
+node_colors <- sapply(node_sex, function(sex) {
+  color_mapping[sex]
+})
+V(g_21)$color <- node_colors
+
+#Prepare to save figure 
+# png(file="./output/Association networks 2021.png",
+    # width=600, height=600)
+ par(oma=c(1,1,1,1), mar=c(5,4, 4, 2) + 0.8, mfrow = c(1, 2))
+# Iterate through com_21 and assign community names to nodes in g_21
+plot(
+  g_21, 
+  vertex.color = node_colors,  # Use the calculated node colors
+  vertex.size = 10,  # Adjust the size of the nodes as needed
+  vertex.label = community_assignments, # Use the extracted community assignments as labels
+  edge.width=E(g_21)$weight*10
+)
+
+title(main = "2021", cex.main = 2)
+
+legend("topleft", legend = names(color_mapping), fill = color_mapping, cex = 1.5)
+
+#Create communities (2022) 
+com_22=fastgreedy.community(g_22) #community detection method
+
+# Assign community names
+mapping <- c(
+  3,  
+  4, 
+  1,  
+  9, 
+  10, 
+  11,  
+  7, 
+  5, 
+  6, 
+  2, 
+  12,
+  8
+)
+
+corrected_memberships <- mapping[com_22$membership]
+
+com_22$membership <- corrected_memberships
+
+community_assignments <- com_22$membership
+
+color_mapping <- c(
+  "female" = "slateblue",
+  "male" = "gold",
+  "unknown" = "gray"
+)
+node_sex <- V(g_22)$sex
+node_colors <- sapply(node_sex, function(sex) {
+  color_mapping[sex]
+})
+V(g_22)$color <- node_colors
+
+#Prepare to save figure 
+# png(file="./output/Association networks 2022.png",width=600, height=600)
+
+# Iterate through com_21 and assign community names to nodes in g_21
+plot(
+  g_22, 
+  vertex.color = node_colors,  # Use the calculated node colors
+  vertex.size = 10,  # Adjust the size of the nodes as needed
+  vertex.label = community_assignments, # Use the extracted community assignments as labels
+  edge.width=E(g_22)$weight*10
+)
+
+title(main = "2022", cex.main = 2)
+
+
+```
+
+## Estimate modulatity
+
+
+Modularity:
+
+- 2021: `r round(modularity(com_21), 2)`
+- 2022: `r round(modularity(com_22), 2)`
+
+
+
+# Calling rate repeatability
+
+## Negative binomial model
+```{r}
+#Data manipulation
+## Joining the two data sets
+d1<-read.csv("./data/raw/vocal_interactions_2021.csv", sep=";")
+d2<-read.csv("./data/raw/vocal_interactions_2022.csv", sep=";")
+colnames(d2)[6]<-"Dyad"
+d<-rbind(d1,d2)
+
+## Adding observation level random effect
+d$ob<-1:nrow(d)
+
+#Stats models
+##Model for inquiry
+mod_inquiry<-glmer.nb(n_inquiry~ 1 + (1|Bat_roosting) + (1|Bat_flying) +  (1|Group), data=d)
+summary(mod_inquiry)
+
+###Extracting variance components
+mu_l<-fixef(mod_inquiry)[1]
+mu<-exp(mu_l)
+theta<-getME(mod_inquiry, "glmer.nb.theta")
+
+VBF_I_l<-VarCorr(mod_inquiry)$Bat_flying[1,1] #Variance Bats Flying
+VBF_I<- (exp(VBF_I_l)-1)*exp(2*mu_l + VBF_I_l)
+
+VBR_I_l<-VarCorr(mod_inquiry)$Bat_roosting[1,1] #Variance Bats Roosting
+VBR_I<-(exp(VBR_I_l)-1)* exp(2*mu_l + VBR_I_l)
+
+VBG_I_l<-VarCorr(mod_inquiry)$Group[1,1] #Variance GRoup
+VBG_I<-(exp(VBG_I_l)-1)* exp(2*mu_l + VBG_I_l)
+
+
+NBV_I<-mu + mu^2/theta
+
+####Repeatabilty roosting individual
+VBR_I/(VBR_I+VBF_I+NBV_I + VBG_I)
+
+####Repeatabilty flying individual
+VBF_I/(VBR_I+VBF_I+NBV_I)
+
+#Stats models
+##Model for inquiry2
+d2<-d[d$n_response>0,]
+mod_inquiry<-glmer.nb(n_inquiry~ 1 + (1|Bat_roosting)+ (1|Bat_flying) +  (1|Group), data=d2)
+summary(mod_inquiry)
+
+###Extracting variance components
+mu_l<-fixef(mod_inquiry)[1]
+mu<-exp(mu_l)
+theta<-getME(mod_inquiry, "glmer.nb.theta")
+
+VBF_I_l<-VarCorr(mod_inquiry)$Bat_flying[1,1] #Variance Bats Flying
+VBF_I<- (exp(VBF_I_l)-1)*exp(2*mu_l + VBF_I_l)
+
+VBR_I_l<-VarCorr(mod_inquiry)$Bat_roosting[1,1] #Variance Bats Roosting
+VBR_I<-(exp(VBR_I_l)-1)* exp(2*mu_l + VBR_I_l)
+
+VBG_I_l<-VarCorr(mod_inquiry)$Group[1,1] #Variance GRoup
+VBG_I<-(exp(VBG_I_l)-1)* exp(2*mu_l + VBG_I_l)
+
+
+NBV_I<-mu + mu^2/theta
+
+####Repeatabilty roosting individual
+VBR_I/(VBR_I+VBF_I+NBV_I)
+
+####Repeatabilty flying individual
+VBF_I/(VBR_I+VBF_I+NBV_I)
+
+
+##Model for response
+mod_response<-glmer.nb(n_response~ 1 + (1|Bat_roosting)+ (1|Bat_flying) +  (1|Group), data=d)
+summary(mod_response)
+
+###Extracting variance components
+mu_l<-fixef(mod_response)[1] #+ fixef(mod_response)[2]*mean(d$n_inquiry, na.rm=TRUE)
+mu<-exp(mu_l)
+theta<-getME(mod_response, "glmer.nb.theta")
+
+VBF_R_l<-VarCorr(mod_response)$Bat_flying[1,1] #Variance Bats Flying
+VBF_R<- (exp(VBF_R_l)-1)*exp(2*mu_l + VBF_R_l)
+
+VBR_R_l<-VarCorr(mod_response)$Bat_roosting[1,1] #Variance Bats Roosting
+VBR_R<-(exp(VBR_R_l)-1)* exp(2*mu_l + VBR_R_l)
+
+VBG_R_l<-VarCorr(mod_response)$Group[1,1] #Variance GRoup
+VBG_R<-(exp(VBG_R_l)-1)* exp(2*mu_l + VBG_R_l)
+
+
+NBV_R<-mu + mu^2/theta
+
+####Repeatabilty roosting individual
+VBR_R/(VBR_R+VBF_R+NBV_R +VBG_R)
+
+####Repeatabilty flying individual
+VBF_R/(VBR_R+VBF_R+NBV_R+VBG_R)
+
+
+```
+
+## Poisson model
+```{r}
+# #Data manipulation
+# ## Joining the two data sets
+# d1<-read.csv("vocal_interactions_2021.csv", sep=";")
+# d2<-read.csv("vocal_interactions_2022.csv", sep=";")
+# 
+# colnames(d2)[6]<-"Dyad"
+# d<-rbind(d1,d2)
+
+## Adding observation level random effect
+d$ob<-1:nrow(d)
+
+#Stats models
+##Model for inquiry with all observations
+mod_inquiry<-glmer(n_inquiry~ 1 + (1|Bat_roosting)+ (1|Bat_flying) + (1|Group) + (1|ob), data=d, family="poisson")
+
+###Extracting variance components
+VBF_I<-VarCorr(mod_inquiry)$Bat_flying[1,1] #Variance Bats Flying
+VBR_I<-VarCorr(mod_inquiry)$Bat_roosting[1,1] #Variance Bats Roosting
+VBG_I<-VarCorr(mod_inquiry)$Group[1,1] #Variance Group
+VOD_I<-VarCorr(mod_inquiry)$ob[1,1] #Variance Overddispersion
+
+PV_I<-log(1/exp(fixef(mod_inquiry)[1]) + 1)  #Variance poisson processs
+
+####Repeatabilty roosting individual
+VBR_I/(VBR_I+VOD_I +VBF_I+PV_I + VBG_I)
+
+####Repeatabilty flying individual
+VBF_I/(VBR_I+VOD_I +VBF_I+PV_I+ VBG_I)
+
+
+##Model for inquiry only when someone responded
+d2<-d[d$n_response>0,]
+mod_inquiry2<-glmer(n_inquiry~ 1 + (1|Bat_roosting)+ (1|Bat_flying) + (1|ob), data=d2, family="poisson")
+
+###Extracting variance components
+VBF_I<-VarCorr(mod_inquiry2)$Bat_flying[1,1] #Variance Bats Flying
+VBR_I<-VarCorr(mod_inquiry2)$Bat_roosting[1,1] #Variance Bats Roosting
+VBG_I<-VarCorr(mod_inquiry)$Group[1,1]
+VOD_I<-VarCorr(mod_inquiry2)$ob[1,1] #Variance Overddispersion
+PV_I<-log(1/exp(fixef(mod_inquiry2)[1]) + 1)  #Variance poisson processs
+
+####Repeatabilty roosting individual
+VBR_I/(VBR_I+VOD_I +VBF_I+PV_I+ VBG_I)
+
+####Repeatabilty flying individual
+VBF_I/(VBR_I+VOD_I +VBF_I+PV_I+ VBG_I)
+
+##Model for response 
+mod_response<-glmer(n_response~ 1+ (1|Bat_roosting)+ (1|Bat_flying) + (1|Group) + (1|ob), data=d, family="poisson")
+summary(mod_response)
+
+###Extracting variance components
+VBF_R<-VarCorr(mod_response)$Bat_flying[1,1] #Variance Bats Flying
+VBR_R<-VarCorr(mod_response)$Bat_roosting[1,1] #Variance Bats Roosting
+VBG_R<-VarCorr(mod_response)$Group[1,1]
+VOD_R<-VarCorr(mod_response)$ob[1,1] #Variance Overddispersion
+PV_R<-log(1/exp(fixef(mod_response)[1]) + 1) #Variance poisson processs
+
+##Repeatabilty roosting individual
+VBR_R/(VBR_R + VOD_R + VBF_R + PV_R + VBG_R)
+
+##Repeatabilty flying individual
+VBF_R/(VBR_R+ VOD_R + VBF_R + PV_R + VBG_R)
+
+
+
+
+```
+
+
+# Calling, association and kinship
+
+## Prepare data
+```{r, eval = FALSE}
+# Code by Gerald Carter, gcarter1640@gmail.com
+
+### clean and wrangle data
+
+# create function to convert matrix to data-frame
+matrix_to_df <- function(m1){
+  data.frame(dyad = paste(rownames(m1)[col(m1)], colnames(m1)[row(m1)], sep="_"),
+             value = c(t(m1)), stringsAsFactors = FALSE)
+}
+
+# get kinship data
+k <- as.matrix(read.csv('./data/raw/KinshipMatrix.csv', sep= ",", row.names = 1))
+
+# check symmetry
+mean(k==t(k), na.rm=T)
+
+# get sex data
+sex1 <- read.csv('supp_21.csv', sep= ";") 
+sex2 <- read.csv('supp_22.csv', sep= ";") 
+
+# get association data
+a21 <- read.csv('associations_2021.csv', sep= ";")
+a22 <- read.csv('associations_2022.csv', sep= ";")
+
+# get calling data
+i21 <- read.csv('vocal_interactions_2021.csv', sep= ";")
+i22 <- read.csv('vocal_interactions_2022.csv', sep= ";")
+
+# tidy sex data
+sex <- 
+  rbind(sex1,sex2) %>% 
+  mutate(bat= paste0('bat', bat_id)) %>% 
+  group_by(bat, sex) %>% 
+  summarize(n= n()) %>% 
+  dplyr::select(bat, sex) %>% 
+  ungroup()
+
+# tidy 2021 association data
+assoc21 <- 
+  a21 %>% 
+  pivot_longer(Bat1:Bat10, names_to = 'names', values_to = "bat") %>% 
+  filter(!is.na(bat)) %>% 
+  mutate(bat= paste0('bat', bat)) %>% 
+  mutate(group= paste0('group', Group)) %>%  
+  mutate(date= dmy(Date)) %>% 
+  dplyr::select(obs= data_id, group, date, bat)
+
+# tidy 2022 association data
+assoc22 <- 
+  a22 %>% 
+  pivot_longer(Bat1:Bat8, names_to = 'names', values_to = "bat") %>% 
+  filter(!is.na(bat)) %>% 
+  mutate(bat= paste0('bat', bat)) %>% 
+  mutate(group= paste0('group', Group)) %>%  
+  mutate(date= dmy(Date)) %>% 
+  dplyr::select(obs= data_id, group, date, bat)
+
+# combine association data
+assoc <- 
+  rbind(assoc21, assoc22) %>% 
+  mutate(obs= paste(obs,group,date, sep= "_")) %>% 
+  dplyr::select(bat, obs) %>% 
+  as.data.frame()
+
+# get number of observations per bat
+obs_per_bat <- 
+  assoc %>% 
+  group_by(bat) %>% 
+  summarize(n.obs=n()) %>% 
+  arrange(desc(n.obs))
+
+# range is 1 to 51 times
+range(obs_per_bat$n.obs)
+
+# pick threshold of observations for including bats in analysis
+# if they have fewer observations than we make their association rates NA
+threshold <- 4
+
+# plot number of observations per bat
+assoc %>% 
+  group_by(bat) %>% 
+  summarize(n.obs=n()) %>% 
+  ggplot(aes(x=n.obs))+
+    geom_histogram(fill="light blue", color="black")+
+    geom_vline(xintercept= threshold, color= 'red', size=1)+
+    xlab("number of observations of bat")+
+    ylab("count of bats")
+
+# get bats seen fewer than threshold number
+low.n.bats <- 
+  assoc %>% 
+  group_by(bat) %>% 
+  summarize(n.obs=n()) %>% 
+  filter(n.obs < threshold) %>% 
+  pull(bat)
+low.n.bats
+length(low.n.bats)
+# 14 bats were seen fewer than 4 times
+
+### get SRI from asnipe
+
+# get association rates as group-by-individual
+gbi <- get_group_by_individual(assoc, data_format="individuals")
+
+# get association network of SRI
+assoc.net<- get_network(association_data=gbi, data_format = "GBI", association_index = "SRI")
+
+# check symmetry
+mean(assoc.net==t(assoc.net))
+
+# get SRI values for every undirected pair as dataframe
+SRI <- matrix_to_df(assoc.net) 
+
+# tidy kinship
+kinship <- 
+  k %>% 
+  matrix_to_df() %>% 
+  separate(dyad, into= c("bat1", "bat2")) %>% 
+  mutate(bat2= str_remove(bat2, "X")) %>% 
+  mutate(bat1= paste0('bat', bat1), bat2= paste0('bat', bat2)) %>% 
+  filter(bat1!=bat2) %>% 
+  # label undirected pair
+  mutate(dyad= ifelse(bat1<bat2, paste(bat1,bat2, sep="_"), paste(bat2,bat1, sep="_"))) %>% 
+  group_by(dyad) %>% 
+  summarize(kinship= first(value)) 
+
+# count trials
+nrow(i21)
+nrow(i22)
+
+# trials with missing data
+rbind(i21,i22) %>% 
+  as_tibble() %>% 
+  filter(is.na(n_response)) %>% 
+  nrow()
+#2
+
+# trials where neither bat called
+rbind(i21,i22) %>% 
+  as_tibble() %>% 
+  filter(n_inquiry==0) %>% 
+  nrow()
+# 5
+
+# fix and tidy calling data
+calling <- 
+  rbind(i21,i22) %>% 
+  mutate(Date= as.character(mdy(Date))) %>% 
+  mutate(group= paste(substr(Date, start=1, stop=4),Group, sep="_")) %>% 
+  # need to recreate these labels because messed up by excel in raw data
+  separate(Dyad, into=c("bat_flying", "bat_roosting"), remove=F) %>% 
+  mutate(bat_flying= paste0('bat', bat_flying), bat_roosting= paste0('bat', bat_roosting)) %>% 
+  # label undirected dyads
+  mutate(dyad= ifelse(bat_flying<bat_roosting, paste(bat_flying, bat_roosting, sep= "_"), paste(bat_roosting, bat_flying, sep= "_"))) %>% 
+  dplyr::select(date= Date, group, bat_flying, bat_roosting, dyad, flight_time, n_inquiry, n_response)
+
+# combine all data
+d <- 
+  # start with calling data
+  calling %>% 
+  # add SRI 
+  mutate(sri= SRI$value[match(.$dyad, SRI$dyad)]) %>% 
+  # add kinship
+  mutate(kinship= kinship$kinship[match(.$dyad, kinship$dyad)]) %>% 
+  # add sexes of flying and roosting bats
+  mutate(flying.sex= sex$sex[match(.$bat_flying, sex$bat)]) %>% 
+  mutate(roosting.sex= sex$sex[match(.$bat_roosting, sex$bat)]) %>% 
+  # label sex combination for flying-->roosting dyad
+  mutate(dyad.sex= paste(flying.sex, roosting.sex, sep= "-->")) %>% 
+  # label sex combination for dyad (male, female, both)
+  mutate(udyad.sex = case_when(
+    flying.sex == 'female' & roosting.sex == 'female' ~ "female-female",
+    flying.sex == 'male' & roosting.sex == 'male' ~ "male-male",
+    TRUE ~ "mixed-sex")) %>% 
+  # replace zero sri (never previously seen together) with NA because association is not 0
+  mutate(sri = if_else(sri==0, NA, sri)) %>% 
+  # if flying bat seen fewer than 4 times, then SRI is NA
+  mutate(sri = if_else(bat_flying %in% low.n.bats, NA, sri)) %>% 
+  # if roosting bat seen fewer than 4 times, then SRI is NA
+  mutate(sri = if_else(bat_roosting %in% low.n.bats, NA, sri))
+           
+  
+# inspect and fix cases where flying bats in more than 2 groups
+t <- 
+  d %>% 
+  group_by(bat_flying, date, group) %>%
+  summarize(n=n()) %>% 
+  arrange(date) %>% 
+  group_by(bat_flying, group) %>% 
+  summarize(n=n()) %>%   
+  group_by(bat_flying) %>% 
+  summarize(n=n()) %>% 
+  filter(n>2) %>% 
+  pull(bat_flying)
+d %>% 
+  dplyr::select(date, group, bat_flying) %>% 
+  filter(bat_flying %in% t) %>% 
+  arrange(bat_flying) %>% 
+  as.data.frame()
+# some of these seem impossible and must be errors
+
+# fix impossible group labels
+d$group[which(d$date=="2021-07-03" & d$bat_flying=="bat982126051278521")] <- "2021_9"
+d$group[which(d$date=="2021-07-03" & d$bat_flying=="bat982126058484300")] <- "2021_9"
+
+# fix cases where roosting bats in more than 2 groups
+t <- 
+  d %>% 
+  group_by(bat_roosting, date, group) %>%
+  summarize(n=n()) %>% 
+  arrange(date) %>% 
+  group_by(bat_roosting, group) %>% 
+  summarize(n=n()) %>%   
+  group_by(bat_roosting) %>% 
+  summarize(n=n()) %>% 
+  filter(n>2) %>% 
+  pull(bat_roosting)
+d %>% 
+  dplyr::select(date, group, bat_roosting) %>% 
+  filter(bat_roosting %in% t) %>% 
+  arrange(bat_roosting) %>% 
+  as.data.frame()
+
+# fix group labels
+d$group[which(d$date=="2021-07-03" & d$bat_roosting=="bat982126058484300")] <- "2021_9"
+
+# group 9 split into groups 9,1 and 9,2 during 2022
+# There are interesting movements between group 9 and 10 and between groups 9,1 and 9,2
+# For this analysis, I'm going to consider group 9,1 and 9,2 as the same group
+d$group[which(d$group=="2022_9,1" | d$group=="2022_9,2")] <- "2021_9"  
+
+# remove trials without inquiry or response calls
+d <- 
+  d %>% # 453 rows
+  as_tibble() %>% 
+  filter(! (is.na(n_inquiry) & is.na(n_response))) %>%   # 451 rows
+  filter(n_inquiry>0) %>% # 446 rows
+  mutate(year= substr(date, 1,4)) # add year
+
+# save data as csv
+write.csv(d, file = paste0('./processed/calling-association-kinship-data.csv'), row.names= F)
+
+
+```
+
+## Explore data
+```{r}
+# set ggplot theme
+theme_set(theme_bw(base_size = 14))
+
+# get data
+raw <- read.csv('./data/processed/calling-association-kinship-data.csv') 
+
+
+###### Create functions to estimate confindence intervals
+# function to get mean and 95% CI of values x via bootstrapping
+boot_ci <- function(x, perms=5000, bca=F) {
+  get_mean <- function(x, d) {
+    return(mean(x[d]))
+  }
+  x <- as.vector(na.omit(x))
+  mean <- mean(x)
+  if(bca){
+    boot <- boot.ci(boot(data=x, 
+                         statistic=get_mean, 
+                         R=perms, 
+                         parallel = "multicore", 
+                         ncpus = 4), 
+                    type="bca")
+    low <- boot$bca[1,4]
+    high <- boot$bca[1,5] 
+  }else{
+    boot <- boot.ci(boot(data=x, 
+                         statistic=get_mean, 
+                         R=perms, 
+                         parallel = "multicore", 
+                         ncpus = 4), 
+                    type="perc")
+    low <- boot$perc[1,4]
+    high <- boot$perc[1,5] 
+  }
+  c(low=low,mean=mean,high=high, N=round(length(x)))
+}
+
+
+# function to get mean and 95% CI via bootstrapping of values y within grouping variable x
+boot_ci2 <- function(d=d, y=d$y, x=d$x, perms=5000, bca=F){
+  df <- data.frame(effect=unique(x))
+  df$low <- NA
+  df$mean <- NA
+  df$high <- NA
+  df$n.obs <- NA
+  for (i in 1:nrow(df)) {
+    ys <- y[which(x==df$effect[i])]
+    if (length(ys)>1 & var(ys)>0 ){
+      b <- boot_ci(y[which(x==df$effect[i])], perms=perms, bca=bca) 
+      df$low[i] <- b[1]
+      df$mean[i] <- b[2]
+      df$high[i] <- b[3]
+      df$n.obs[i] <- b[4]
+    }else{
+      df$low[i] <- min(ys)
+      df$mean[i] <- mean(ys)
+      df$high[i] <- max(ys)
+      df$n.obs[i] <- length(ys)
+    }
+  }
+  df
+}
+
+# look at data
+# head(raw)
+# group is the year and social group
+# dyad is the undirected pair (flying and roosting bat) in alphanumeric order
+# sri is simple ratio index of association
+# flying.sex is sex of flying bat
+# roosting.sex is sex of roosting bat
+# dyad.sex is the sex of the flying and roosting bat
+# udyad.sex is females, males, or mixed
+
+# add a few variables to the data
+d <- 
+  raw %>% 
+  # get log count of inquiry calls
+  mutate(log_inquiry = log(n_inquiry)) %>% 
+  # rescale kinship so 1 unit is 0.5 
+  mutate(kinship2 = kinship*2) %>% 
+  # if the roosting bat leaves the roost (escapes) then flight time is < 300 s
+  mutate(escape= as.numeric(flight_time<300)) %>% 
+  # convert flight time from seconds to minutes (for easier interpretation)
+  mutate(flight_time2 = flight_time/60)
+
+
+###### Describe the data-------------
+
+# how many trials?
+# d %>% nrow()
+#446
+
+# # how many undirected pairs have vocal data? 
+# d %>% 
+#   pull(dyad) %>% 
+#   unique() %>% 
+#   length
+#139 undirected pairs
+
+# d %>% 
+#   group_by(bat_flying, bat_roosting) %>% 
+#   summarize(n=n()) 
+# 254 directed pairs
+
+# how many groups? 
+# n_distinct(d$group) 
+# 23
+
+# how many of these have association data
+# d %>% 
+#   group_by(dyad) %>% 
+#   summarize(sri= mean(sri)) %>% 
+#   filter(!is.na(sri))
+# 133 pairs have association
+
+# how many of these have kinship data
+# d %>% 
+#   group_by(dyad) %>% 
+#   summarize(kinship= mean(kinship)) %>% 
+#   filter(!is.na(kinship))
+# 82 pairs have kinship data
+
+# how many related undirected pairs
+# d %>% 
+#   group_by(dyad) %>% 
+#   summarize(kinship= mean(kinship)) %>% 
+#   filter(kinship>0)
+# 32 kin pairs
+
+# how many unrelated undirected pairs
+# d %>% 
+#   group_by(dyad) %>% 
+#   summarize(kinship= mean(kinship)) %>% 
+#   filter(kinship==0)
+# 50 nonkin pairs
+
+# what is mean kinship in group?
+grp.kin <- 
+  d %>% 
+  group_by(dyad, group) %>% 
+  summarize(kinship= mean(kinship, na.rm=T)) %>% 
+  group_by(group) %>% 
+  summarize(kinship= mean(kinship, na.rm=T), n=n()) %>% 
+  as.data.frame()
+
+set.seed(123)
+# grp.kin %>% pull(kinship) %>% boot_ci(bca=T)
+# 0.23, 95% CI = [0.16, 0.31]
+
+# how many groups have kin?
+# grp.kin %>% filter(kinship>0)
+# 17
+
+# how many groups have no kin?
+# grp.kin %>% filter(kinship==0)
+# 4
+  
+# plot distribution of kinship
+d %>% 
+  ggplot(aes(x=kinship))+
+  facet_wrap(~udyad.sex, ncol=1, scales= 'free_y')+
+  geom_histogram(fill="light blue", color="black")+
+  ggtitle("pairwise kinship")
+
+# # check categories
+# d %>%
+#   filter(!is.na(kinship)) %>% 
+#   group_by(dyad) %>% 
+#   summarize(kinship= mean(kinship)) %>% 
+#   group_by(kinship) %>% 
+#   summarize(n=n()) 
+
+##### Effect of kinship on association-------------
+
+# plot distribution of assoc
+d %>% 
+  ggplot(aes(x=sri))+
+  facet_wrap(~udyad.sex, ncol=1, scale ="free_y")+
+  geom_histogram(fill="light blue", color="black")+
+  xlab("association rate")+
+  ggtitle("pairwise SRI values")
+# looks ok
+
+# what is mean and 95% CI of assoc among flying and roosting bats?
+# set.seed(123)
+# d %>% 
+#   group_by(dyad) %>% 
+#   summarize(sri = mean(sri)) %>% 
+#   pull(sri) %>% 
+#   boot_ci(bca=T)
+# 0.51, 95% CI = [0.47, 0.55]
+# a bit low, expected from past work is 0.76
+
+# now only nonkin
+set.seed(123)
+k1 <- 
+  d %>% 
+  filter(kinship==0) %>% 
+  group_by(dyad) %>% 
+  summarize(sri = mean(sri)) %>% 
+  pull(sri) %>% 
+  boot_ci(bca=T) %>% 
+  c(kinship= 0)
+# k1
+# 0.572, 95% CI = [0.500, 0.636]
+
+# now only kin
+# set.seed(123)
+# d %>% 
+#   filter(kinship>0) %>% 
+#   group_by(dyad) %>% 
+#   summarize(sri = mean(sri)) %>% 
+#   pull(sri) %>% 
+#   boot_ci(bca=T)
+# 0.686, 95% CI = [0.631, 0.741]
+
+# now only close kin
+set.seed(123)
+k2 <- 
+  d %>% 
+  filter(kinship==0.5) %>% 
+  group_by(dyad) %>% 
+  summarize(sri = mean(sri)) %>% 
+  pull(sri) %>% 
+  boot_ci(bca=T)%>% 
+  c(kinship= 0.5)
+# k2
+# 0.687, 95% CI = [0.628, 0.750]
+
+# now only 0.25 kin
+set.seed(123)
+k3 <- 
+  d %>% 
+  filter(kinship==0.25) %>% 
+  group_by(dyad) %>% 
+  summarize(sri = mean(sri)) %>% 
+  pull(sri) %>% 
+  boot_ci(bca=T)%>% 
+  c(kinship= 0.25)
+# k3
+# 0.684, 95% CI = [0.542, 0.783]
+
+# compile means
+k <- 
+  rbind(k1,k2,k3) %>% 
+  data.frame() %>% 
+  mutate(kin= as.character(kinship)) %>% 
+  mutate(kin2= kinship>0) %>% 
+  mutate(assoc= mean)
+
+# plot association by kinship
+(kin.dyads.plot<- 
+    d %>% 
+    filter(!is.na(kinship)) %>% 
+    group_by(dyad) %>% 
+    summarize(kinship= mean(kinship), assoc= mean(sri), udyad.sex= first(udyad.sex)) %>% 
+    mutate(kin2= kinship>0) %>%  
+    mutate(kin= as.character(kinship)) %>% 
+    ggplot(aes(x=kin, y=assoc, group= kin, color=kin2))+
+    geom_jitter(size=2, width= 0.1, height=0, aes(shape= udyad.sex))+
+    geom_point(data= k, position = position_nudge(x = 0.25), size=3)+
+    geom_errorbar(data=k, aes(ymin=low, ymax=high, width=.1), position = position_nudge(x = 0.25), size=1)+
+    xlab("kinship")+
+    ylab("association rate (simple ratio index)")+
+    scale_color_manual(values= c("darkgrey", "darkred"))+
+    theme(legend.position= "none", legend.title = element_blank()))
+
+# save as PDF
+# ggsave(
+#   "kin_association.pdf",
+#   plot = kin.dyads.plot,
+#   scale = 1,
+#   width = 3,
+#   height = 5,
+#   units = "in",
+#   dpi = 300)
+
+
+##### Effect of flight time on calling ----------
+
+### How does flight time and count of inquiry calls predict count of response calls?
+
+# plot number of response calls by flight time
+t1 <- 
+  d %>% 
+  mutate(kinship = kinship>0.1) %>% 
+  ggplot(aes(x=flight_time, y=n_response))+
+  geom_point(size=2, alpha=0.3, aes(color= kinship, shape= kinship))+ 
+  geom_smooth(method="glm.nb")+
+  scale_color_manual(values= c("darkgrey", "darkred"))+
+  xlab("flight time (seconds)")+
+  ylab("response call count")+
+  theme(legend.position= "none")
+
+# plot number of inquiry calls by flight time
+t2 <- 
+  d %>% 
+  mutate(kinship = kinship>0.1) %>% 
+  ggplot(aes(x=flight_time, y=n_inquiry))+
+  geom_point(size=2, alpha=0.3, aes(color= kinship, shape=kinship))+ 
+  geom_smooth(method = "glm.nb")+
+  scale_color_manual(values= c("darkgrey", "darkred"))+
+  xlab("flight time (seconds)")+
+  ylab("inquiry call count")+
+  theme(legend.position= "none")
+
+# plot together
+t <- t1+t2
+# ggsave(
+#   filename= "flight_time.pdf",
+#   plot = t,
+#   scale = 1,
+#   width = 7,
+#   height = 7,
+#   units = c("in", "cm", "mm", "px"),
+#   dpi = 300)
+```
+
+## Statistical analysis
+```{r}
+# try poisson model for effect of flight time on inquiry calling
+t <- glmer (n_inquiry ~ flight_time2 + (1|bat_flying) + (1|bat_roosting) + (1|group), data= d, family= poisson)
+check_overdispersion(t)
+
+# negative binomial model (NBM)
+t <- glmmTMB(n_inquiry ~ flight_time2 + (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d,
+                ziformula=~0,
+                family=nbinom2)
+check_overdispersion(t)
+t2 <- tidy(t,conf.int=TRUE,exponentiate=T,effects="fixed", conf.method="profile")
+t2
+# for every minute of flight time, the inquiry call count increases by a factor of 1.43 [1.36, 1.49]
+
+# try poisson model for effect of flight time on response calling
+t <- glmer (n_response ~ flight_time2 + log_inquiry + (1|bat_flying) + (1|bat_roosting) + (1|group), data= d, family= poisson)
+check_overdispersion(t)
+
+# try NBM
+t <- glmmTMB(n_response ~ flight_time2 + log_inquiry+ (1|bat_flying) + (1|bat_roosting) + (1|group),
+             data=d,
+             ziformula=~1,             
+             family=nbinom2)
+check_overdispersion(t)
+check_zeroinflation(t)
+t2 <- tidy(t,conf.int=TRUE,exponentiate=T,effects="fixed", conf.method="profile")
+t2
+# for every minute of flight time, the response call count increases by a factor of 1.58 [1.26, 1.95]
+
+##### Effect of inquiry calling on response calling------------
+
+# plot with log counts
+d %>% 
+  ggplot(aes(x=log_inquiry, y=log(n_response+1)))+
+  geom_point(size=2)+ 
+  geom_smooth(method= "lm")+
+  xlab("log inquiry call count")+
+  ylab("log (x+1) response call count")
+
+# plot negative binomial curve
+# plot all bats
+(t1 <- 
+  d %>% 
+  mutate(label= "all pairs") %>% 
+  mutate(escape= as.logical(escape)) %>% 
+  ggplot(aes(x=log_inquiry, y=n_response))+
+    facet_wrap(~label)+
+  geom_point(size=2, alpha=0.5)+ 
+  geom_smooth(method="glm.nb")+
+  xlab("log of inquiry call count")+
+  ylab("response call count"))+
+  theme(legend.position= 'none')
+
+# plot with kinship
+(t2 <- 
+  d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(escape= as.logical(escape)) %>% 
+  mutate(kin= if_else(kinship>0.1, "kin", "nonkin")) %>% 
+  mutate(kin= factor(kin, levels= c("nonkin", "kin"))) %>% 
+  ggplot(aes(x=log_inquiry, y=(n_response), color=kin, group=kin))+
+  facet_wrap(~kin)+
+  geom_point(size=2, alpha=0.5, aes(shape= escape))+ 
+  geom_smooth(method="glm.nb")+
+  xlab("log of inquiry call count")+
+  ylab("response call count")+
+  scale_color_manual(values= c("darkgrey", "darkred"))+
+  theme(legend.position= "none")+
+  theme(axis.text.y=element_blank(),
+          axis.title.y=element_blank(),
+          legend.position="none"))
+
+# plot as linear model
+(t3 <- 
+    d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kin= if_else(kinship>0.1, "kin", "nonkin")) %>% 
+  mutate(kin= factor(kin, levels= c("nonkin", "kin"))) %>% 
+  ggplot(aes(x=log_inquiry, y=log(n_response+1), color=kin, group=kin))+
+  facet_wrap(~kin)+
+  geom_point(size=2, alpha=0.5)+ 
+  geom_smooth(method="lm")+
+  xlab("log of inquiry call count")+
+  ylab("log of response call count")+
+  scale_color_manual(values= c("darkgrey", "darkred"))+
+  theme(legend.position= "none"))
+
+(inquiry.response <- t1+t2+plot_layout(ncol = 2) + plot_layout(widths = c(1, 2)))
+
+# save as PDF
+# ggsave(
+#   "inquiry_response.pdf",
+#   plot = inquiry.response,
+#   width = 14,
+#   height = 7,
+#   units = "in",
+#   dpi = 300)
+
+# for plots, get residuals from negative binomial mixed effect model predicting number of responses by number of inquiry calls
+fit <- glmmTMB(n_response ~ log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d,
+                ziformula=~1,
+                family=nbinom2)
+# get difference between observed response count and predicted response count
+# add this response score to data for plotting
+# this value represents response calling more than expected from inquiry calls
+d$resid_response <- d$n_response - predict(fit, type= "response", newdata= d, allow.new.levels = T)
+
+
+# plot number of inquiry calls by kinship with partner
+d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kin= as.character(kinship)) %>% 
+  ggplot(aes(x=kin, y=n_inquiry, group= kin))+
+  geom_violin(fill=NA, width=1)+
+  geom_jitter(size=2, width= 0.1, height=0, aes(color= udyad.sex))+
+  xlab("kinship")+
+  ylab("number of inquiry calls")+
+  theme(legend.position= "top", legend.title = element_blank())
+
+# plot number of response calls by kinship with partner
+d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kin= as.character(kinship)) %>% 
+  ggplot(aes(x=kin, y=n_response, group= kin))+
+  geom_violin(fill=NA, width=1)+
+  geom_jitter(size=2, width= 0.1, height=0, aes(color= udyad.sex))+
+  xlab("kinship")+
+  ylab("number of response calls")+
+  theme(legend.position= "top", legend.title = element_blank())
+
+# plot residual response call variation 
+d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kin= as.character(kinship)) %>% 
+  ggplot(aes(x=kin, y=resid_response, group= kin))+
+  geom_violin(fill=NA, width=1)+
+  geom_jitter(size=2, width= 0.1, height=0, aes(color= udyad.sex))+
+  xlab("kinship")+
+  ylab("residual response call variation")+
+  theme(legend.position= "top", legend.title = element_blank())
+```
+
+```{r}
+# create function to plot variable by kinship with means and 95% CIs
+plot_kinship_effect <- function(d=d, y= d$sri, label= 'label') {
+  # plot association by kinship
+  set.seed(123)
+  means <- 
+    d %>% 
+    mutate(y=y) %>% 
+    filter(!is.na(kinship)) %>% 
+    group_by(dyad) %>% 
+    summarize(kinship= mean(kinship), y= mean(y), udyad.sex= first(udyad.sex)) %>% 
+    mutate(kin= ifelse(kinship>0, "kin", "nonkin")) %>% 
+    dplyr::select(kin, y) %>% 
+    boot_ci2(y= .$y, x=.$kin, bca=T) %>% 
+    rename(kin= effect) %>% 
+    mutate(kin= factor(kin, levels= c("nonkin", "kin")))
+  points <- 
+    d %>% 
+    mutate(y=y) %>% 
+    filter(!is.na(kinship)) %>% 
+    group_by(dyad) %>% 
+    summarize(kinship= mean(kinship), y= mean(y), udyad.sex= first(udyad.sex)) %>% 
+    mutate(kin= ifelse(kinship>0, "kin", "nonkin")) %>% 
+    mutate(kin= factor(kin, levels= c("nonkin", "kin")))
+  # plot means and 95% CI
+  means %>% 
+    ggplot(aes(x=kin, y=mean, color= kin))+
+    geom_jitter(data= points, aes(y= y), size=1, alpha=0.5, width=0.1)+
+    geom_point(position = position_nudge(x = 0.25), size=3)+
+    geom_errorbar(aes(ymin=low, ymax=high, width=.1), position = position_nudge(x = 0.25), size=1)+
+    xlab("")+
+    ylab(label) +
+    scale_color_manual(values= c("darkgrey", "darkred"))+
+    coord_flip()+                     
+    theme_bw()+
+    theme(legend.position= "none")
+}
+
+# plot effect of kinship on SRI
+(p1 <- plot_kinship_effect(d,d$sri, label= 'association (SRI)'))
+
+# plot effect of kinship on inquiry calling
+(p2 <- plot_kinship_effect(d,d$n_inquiry/(d$flight_time/60), label= 'inquiry calls per min of flight time'))
+
+# plot effect of kinship on response calling
+(p3 <- plot_kinship_effect(d,d$n_response/(d$flight_time/60), label= 'response calls per min of flight time'))
+
+# plot effect of kinship on response calling
+(p4 <- plot_kinship_effect(d,d$resid_response, label= 'residual response call variation'))
+
+# plot all
+(kinship.effects <- p1+p2+p3+p4+plot_layout(ncol = 1))
+
+# save as PDF
+# ggsave(
+#   "kinship_effects.pdf",
+#   plot = kinship.effects,
+#   scale = 1,
+#   width = 3.5,
+#   height = 7,
+#   units = "in",
+#   dpi = 300)
+```
+
+
+```{r, fig.height=10}
+# plot number of inquiry calls by association and kinship (by dyad type)
+t1 <- 
+  d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kin= ifelse(kinship>0.1, "kin", "nonkin")) %>% 
+  ggplot(aes(x=sri, y=log_inquiry))+
+  facet_wrap(~dyad.sex, scales= "free_y")+
+  geom_point(aes(color=kin), size=2, alpha=0.6)+
+  geom_smooth(method= "lm")+
+  xlab("association rate (simple ratio index)")+
+  ylab("inquiry call count (log transformed)")+
+  scale_colour_manual(values= c("darkred", "grey"))+
+  theme_bw()+
+  theme(legend.position= "none", legend.title = element_blank())
+
+# plot number of response calls by association and kinship (by dyad type)
+t2 <- 
+  d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kin= ifelse(kinship>0.1, "kin", "nonkin")) %>% 
+  ggplot(aes(x=sri, y=log(n_response+1)))+
+  facet_wrap(~dyad.sex, scales= "free_y")+
+  geom_point(aes(color=kin), size=2, alpha=0.6)+
+  geom_smooth(method= "lm")+
+  xlab("association rate (simple ratio index)")+
+  ylab("response call count (log transformed)")+
+  scale_colour_manual(values= c("darkred", "grey"))+
+  theme_bw()+
+  theme(legend.position= "none", legend.title = element_blank())
+ 
+# plot residual response calling by association (by dyad type)- controlling for inquiry calls
+t3 <- 
+  d %>% 
+   filter(!is.na(kinship)) %>% 
+   mutate(kin= ifelse(kinship>0.1, "kin", "nonkin")) %>% 
+   ggplot(aes(x=sri, y=resid_response))+
+   facet_wrap(~dyad.sex, scales= "free_y")+
+   geom_point(aes(color=kin), size=2, alpha=0.6)+
+   geom_smooth(method= "lm")+
+   xlab("association rate (simple ratio index)")+
+   ylab("residual response call variation")+
+   scale_colour_manual(values= c("darkred", "grey"))+
+  theme_bw()+
+   theme(legend.position= "none", legend.title = element_blank())
+
+# combine plots
+(by.sex.plot <- t1+t2+t3+plot_layout(ncol = 1)+ plot_annotation(tag_levels = 'A'))
+
+# save as PDF
+# ggsave(
+#   "by_sex_plot.pdf",
+#   plot = by.sex.plot,
+#   scale = 1,
+#   width = 7,
+#   height = 14,
+#   units = "in",
+#   dpi = 300)
+```
+
+### Effect of kinship and association on response calling
+
+```{r}
+
+# poisson model is overdispersed
+t <- glmer(n_response ~ kinship*sri + log_inquiry + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group), family= poisson, data = d)
+check_overdispersion(t)
+
+# fit negative binomial model (NBM)
+t <- glmmTMB(n_response ~ kinship*sri + log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+               data=d,
+               ziformula=~0,
+               family=nbinom2)
+check_overdispersion(t)
+check_zeroinflation(t, tolerance = 0.05)
+AIC(t) # 2700
+BIC(t) # 2734
+
+# fit zero-inflated NBM
+fit <- glmmTMB(n_response ~ kinship*sri + log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+               data=d,
+               ziformula=~1,
+               family=nbinom2)
+AIC(fit) #2649
+BIC(fit) # 2687
+summary(fit)
+
+# fit zero-inflated NBM without interaction
+fit <- glmmTMB(n_response ~ kinship + sri + log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d,
+                ziformula=~1,
+                family=nbinom2)
+AIC(fit) #2650
+BIC(fit) # 2684
+summary(fit)
+
+# get predicted values
+d$n_response_predicted <- predict(fit, type= "response", newdata= d, allow.new.levels = T)
+
+# plot model performance
+d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kinship= kinship>0) %>% 
+  ggplot(aes(x=n_response, y=n_response_predicted))+
+    geom_point(size=2, aes(color=kinship))+
+    geom_smooth(method= "lm")+
+    xlab("observed count of response calls")+
+  ylab("predicted count of response calls")+
+  scale_color_manual(values= c("darkgrey", "darkred"))+
+  theme(legend.position= "top")
+# get relationship between predicted and observed
+summary(lm(n_response_predicted~n_response, data=d)) # r-squared= 0.46
+
+# get model coefficients with 95% CIs
+coefs <- 
+  tidy(fit,conf.int=TRUE,exponentiate=F,effects="fixed", conf.method="profile") %>% 
+  filter(component=="cond") %>% 
+  dplyr::select(-effect, -component) %>% 
+  mutate(type= "full model")
+# coefs
+
+# save model results
+# write.csv(coefs, file="response_model_results.csv")
+
+# effect of SRI with kin only
+fitk <- glmmTMB(n_response ~ sri+log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d %>% filter(kinship>0),
+                ziformula=~1,
+                family=nbinom2)
+coefs.k <- 
+  tidy(fitk,conf.int=TRUE,exponentiate=F,effects="fixed", conf.method="profile") %>% 
+  filter(component=="cond") %>% 
+  dplyr::select(-effect, -component) %>% 
+  mutate(type= "kin only")
+# coefs.k
+
+# effect of SRI with nonkin only
+fitn <- glmmTMB(n_response ~ sri + log_inquiry + offset(log(flight_time))  + (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d %>% filter(kinship==0),
+                ziformula=~1,
+                family=nbinom2)
+# get 95% CI
+coefs.n <- 
+  tidy(fitn,conf.int=TRUE,exponentiate=F,effects="fixed", conf.method="profile") %>% 
+  filter(component=="cond") %>% 
+  dplyr::select(-effect, -component) %>% 
+  mutate(type= "nonkin only")
+# coefs.n
+
+# plot model results
+theme_set(theme_bw(base_size = 12))
+plot1 <- 
+  coefs %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term= case_when(
+    term == 'sri' ~ "association",
+    term == 'kinship' ~ "kinship",
+    term == 'log_inquiry' ~ "log count of inquiry calls",
+    term == 'kinship:sri' ~ "association x kinship interaction")) %>% 
+  mutate(term= factor(term, levels =c("log count of inquiry calls",
+                                      "association x kinship interaction",
+                                      "association", 
+                                      "kinship"))) %>% 
+  mutate(term = fct_rev(term)) %>% 
+  ggplot(aes(x=estimate, y=term))+
+  geom_point(size=2)+
+  geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
+  geom_vline(xintercept = 0, linetype= "dashed")+
+  ylab("")+
+  xlab("coefficient")+
+  coord_cartesian(xlim= c(-1.5, 1.5))+
+  theme(axis.text=element_text(size=12), strip.text = element_text(size=12))
+plot1
+
+# save as PDF
+# ggsave(
+#   "response_model_results.pdf",
+#   plot = plot1,
+#   scale = 1,
+#   width = 5,
+#   height = 2,
+#   units = "in",
+#   dpi = 300)
+
+
+# check that sri and kinship do not predict response calls as single predictors 
+# fit zero-inflated negative binomial model with only sri
+t <- glmmTMB(n_response ~ sri + log_inquiry+ offset(log(flight_time))  + (1|bat_flying) + (1|bat_roosting) + (1|group),
+               data=d,
+               ziformula=~1,
+               family=nbinom2)
+summary(t)
+
+# fit zero-inflated negative binomial model with only kinship
+t <- glmmTMB(n_response ~ kinship +  log_inquiry+  offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+               data=d,
+               ziformula=~1,
+               family=nbinom2)
+summary(t)
+
+######## Effect of kinship and association on inquiry calling---------
+
+# poisson model is overdispersed
+t <- glmer(n_inquiry ~ kinship*sri + log(n_response+1) + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group), family= poisson, data = d)
+check_overdispersion(t)
+
+# fit negative binomial model (NBM) with log responses
+t <- glmmTMB(n_inquiry ~ kinship*sri + log(n_response+1) + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+             data=d,
+             ziformula=~0,
+             family=nbinom2)
+check_overdispersion(t)
+AIC(t) # 3130
+BIC(t) # 3163
+
+# fit NBM with responses
+t<- glmmTMB(n_inquiry ~ kinship*sri + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+             data=d,
+             ziformula=~0,
+             family=nbinom2)
+check_overdispersion(t)
+AIC(t) #3130
+BIC(t) # 3164
+summary(t)
+
+# fit NBM with responses without interaction
+fit2 <- glmmTMB(n_inquiry ~ kinship + sri + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d,
+                ziformula=~0,
+                family=nbinom2)
+AIC(fit2) #3129
+BIC(fit2) # 3159
+summary(fit2)
+# get predicted values
+d$n_inquiry_predicted <- predict(fit2, type= "response", newdata= d, allow.new.levels = T)
+
+# plot model performance
+d %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kinship= kinship>0) %>% 
+  ggplot(aes(x=n_inquiry, y=n_inquiry_predicted))+
+  geom_point(size=2, aes(color=kinship))+
+  geom_smooth(method= "lm")+
+  xlab("observed count of inquiry calls")+
+  ylab("predicted count of inquiry calls")+
+  scale_color_manual(values= c("darkgrey", "darkred"))+
+  theme(legend.position= "top")
+# get relationship between predicted and observed
+summary(lm(n_inquiry_predicted~n_inquiry, data=d)) # r-squared= 0.71
+
+# get model coefficients
+summary(fit2)
+coefs2 <- 
+  tidy(fit2,conf.int=TRUE,exponentiate=F,effects="fixed", conf.method="profile") %>% 
+  filter(component=="cond") %>% 
+  dplyr::select(-effect, -component) %>% 
+  mutate(type= "full model")
+# coefs2
+
+# save model results
+# write.csv(coefs2, file="inquiry_model_results.csv")
+
+# plot model results
+theme_set(theme_bw(base_size = 12))
+plot2 <- 
+  coefs2 %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term= case_when(
+    term == 'sri' ~ "association",
+    term == 'kinship' ~ "kinship",
+    term == 'n_response' ~ "response calls")) %>% 
+  mutate(term= factor(term, levels =c("response calls",
+                                      "association", 
+                                      "kinship"))) %>% 
+  mutate(term = fct_rev(term)) %>% 
+  ggplot(aes(x=estimate, y=term))+
+  geom_point(size=2)+
+  geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
+  geom_vline(xintercept = 0, linetype= "dashed")+
+  ylab("")+
+  xlab("estimate (log odds)")+
+  theme(axis.text=element_text(size=12), strip.text = element_text(size=12))
+plot2
+
+
+# save as PDF
+# ggsave(
+#   "inquiry_model_results.pdf",
+#   plot = plot1,
+#   scale = 1,
+#   width = 7,
+#   height = 3.5,
+#   units = "in",
+#   dpi = 300)
+
+# get relative amount of variance explained by random intercept
+tidy(fit2,conf.int=F,exponentiate=F) %>%
+  filter(effect== "ran_pars") %>% 
+  mutate(variance= estimate^2) %>% 
+  dplyr::select(effect, group, variance) %>% 
+  group_by(effect) %>% 
+  mutate(sum= sum(variance)) %>% 
+  mutate(prop= variance/sum)
+
+# confirm no effect with single predictors
+# association
+t <- glmmTMB(n_inquiry ~ sri + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+             data=d,
+             ziformula=~0,
+             family=nbinom2)
+summary(t)
+
+# kinship
+t <- glmmTMB(n_inquiry ~ kinship + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d,
+                ziformula=~0,
+                family=nbinom2)
+summary(t)
+  
+
+
+```
+
+
+<!-- '&nbsp;' adds blank space -->
+
+
+
+<!-- light green box -->
+
+<div class="alert alert-success">
+
+# Takeaways {.unnumbered .unlisted}
+
+- Individual ID but not kinship or association explain calling rates 
+</div>
+
+&nbsp;
+
+<!-- '---' adds a gray vertical line -->
+
+---
+
+&nbsp; 
+ 
+ <!-- add packages used, system details and versions  -->
+ 
+# Session information {.unnumbered .unlisted}
+
+```{r session info, echo=F}
+
+sessionInfo()
+
+```

@@ -19,7 +19,7 @@ In this study we tested if disc-winged bats (_Thyroptera tricolor_) produce more
 
 ## Estimating kinship
 * [Pipeline Markdown](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/Main/Pipeline%20GBS%20relatedness%20(Thyroptera).md)
-* [Pipeline pdf](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/Main/Pipeline%20GBS%20relatedness%20(Thyroptera).md)
+* [Pipeline pdf](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/Main/Pipeline%20GBS%20relatedness%20(Thyroptera).pdf)
 
 ## Status
 Project is: In revision for the special theme issue "The power of sound: unravelling how acoustic communication shapes group dynamics" at Philosophical Transactions of the Royal Society B.

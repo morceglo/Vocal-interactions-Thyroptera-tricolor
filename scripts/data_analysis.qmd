@@ -1,6 +1,6 @@
 ---
 title: Data analysis
-subtitle: Vocal interactions in Thyroptera tricolor
+subtitle: Vocal interactions in Spix's disc-winged bats (*Thyroptera tricolor*)
 author: Marcelo Araya-Salas
 date: "`r Sys.Date()`"
 toc: true
@@ -23,7 +23,7 @@ editor_options:
 
 Data analysis for the paper:
 
-Gloriana Chaverri, Maria Sagot, Jennifer L. Stynoski, Marcelo Araya-Salas, Yimen Araya-Ajoy, Martina Nagy, Mirjam Knörnschild, Silvia Chaves-Ramírez, Nicole Rose, Mariela Sánchez-Chavarría, Yelananie Jiménez-Torres, Deilyn Ulloa-Sanabria, Hellen Solís-Hernández, Gerald G. Carter. In review. Contact-calling rates within groups of disc-winged bats vary by caller but not by the receiver’s identity, kinship, or association. Philosophical Transactions of the Royal Society B.  
+G Chaverri, M Sagot, JL Stynoski, M Araya-Salas, Y Araya-Ajoy, M Nagy, M Knörnschild, S Chaves-Ramírez, N Rose, M Sánchez-Chavarría, Y Jiménez-Torres, D Ulloa-Sanabria, H Solís-Hernández, GG Carter. In review. **Contact-calling rates within groups of disc-winged bats vary by caller but not by the receiver’s identity, kinship, or association**. Philosophical Transactions of the Royal Society B.  
 
 </div>
 
@@ -87,9 +87,116 @@ knitr::opts_knit$set(root.dir = "..")
 source("https://raw.githubusercontent.com/maRce10/sketchy/main/R/load_packages.R")
 
 # install/ load packages
-sketchy::load_packages(packages = c("igraph", "bipartite", "asnipe", "assortnet", "ggplot2", "ggmap", "ecodist", "igraphdata", "statnet", "RColorBrewer", "tidyverse", "geosphere", "mapproj", "sna", "stringr", "lme4", "glmmTMB", "broom.mixed", "boot", "patchwork", "performance", "MASS"))
+sketchy::load_packages(packages = c("igraph", "bipartite", "asnipe", "assortnet", "ggplot2", "ggmap", "ecodist", "igraphdata", "statnet", "RColorBrewer", "tidyverse", "geosphere", "mapproj", "sna", "stringr", "lme4", "glmmTMB", "broom.mixed", "boot", "patchwork", "performance", "MASS", "viridis"))
 
 ```
+
+# Functions and global parameters {.unnumbered .unlisted}
+```{r}
+
+# set ggplot theme
+theme_set(theme_bw(base_size = 14))
+
+###### Create functions to estimate confindence intervals
+# function to get mean and 95% CI of values x via bootstrapping
+boot_ci <- function(x, perms=5000, bca=F) {
+  get_mean <- function(x, d) {
+    return(mean(x[d]))
+  }
+  x <- as.vector(na.omit(x))
+  mean <- mean(x)
+  if(bca){
+    boot <- boot.ci(boot(data=x, 
+                         statistic=get_mean, 
+                         R=perms, 
+                         parallel = "multicore", 
+                         ncpus = 4), 
+                    type="bca")
+    low <- boot$bca[1,4]
+    high <- boot$bca[1,5] 
+  }else{
+    boot <- boot.ci(boot(data=x, 
+                         statistic=get_mean, 
+                         R=perms, 
+                         parallel = "multicore", 
+                         ncpus = 4), 
+                    type="perc")
+    low <- boot$perc[1,4]
+    high <- boot$perc[1,5] 
+  }
+  c(low=low,mean=mean,high=high, N=round(length(x)))
+}
+
+# function to get mean and 95% CI via bootstrapping of values y within grouping variable x
+boot_ci2 <- function(d=d, y=d$y, x=d$x, perms=5000, bca=F){
+  df <- data.frame(effect=unique(x))
+  df$low <- NA
+  df$mean <- NA
+  df$high <- NA
+  df$n.obs <- NA
+  for (i in 1:nrow(df)) {
+    ys <- y[which(x==df$effect[i])]
+    if (length(ys)>1 & var(ys)>0 ){
+      b <- boot_ci(y[which(x==df$effect[i])], perms=perms, bca=bca) 
+      df$low[i] <- b[1]
+      df$mean[i] <- b[2]
+      df$high[i] <- b[3]
+      df$n.obs[i] <- b[4]
+    }else{
+      df$low[i] <- min(ys)
+      df$mean[i] <- mean(ys)
+      df$high[i] <- max(ys)
+      df$n.obs[i] <- length(ys)
+    }
+  }
+  df
+}
+
+# create function to convert matrix to data-frame
+matrix_to_df <- function(m1){
+  data.frame(dyad = paste(rownames(m1)[col(m1)], colnames(m1)[row(m1)], sep="_"),
+             value = c(t(m1)), stringsAsFactors = FALSE)
+}
+
+# create function to plot variable by kinship with means and 95% CIs
+plot_kinship_effect <- function(d=d, y= d$sri, label= 'label') {
+  # plot association by kinship
+  set.seed(123)
+  means <- 
+    d %>% 
+    mutate(y=y) %>% 
+    filter(!is.na(kinship)) %>% 
+    group_by(dyad) %>% 
+    summarize(kinship= mean(kinship), y= mean(y), udyad.sex= first(udyad.sex)) %>% 
+    mutate(kin= ifelse(kinship>0, "kin", "nonkin")) %>% 
+    dplyr::select(kin, y) %>% 
+    boot_ci2(y= .$y, x=.$kin, bca=T) %>% 
+    rename(kin= effect) %>% 
+    mutate(kin= factor(kin, levels= c("nonkin", "kin")))
+  points <- 
+    d %>% 
+    mutate(y=y) %>% 
+    filter(!is.na(kinship)) %>% 
+    group_by(dyad) %>% 
+    summarize(kinship= mean(kinship), y= mean(y), udyad.sex= first(udyad.sex)) %>% 
+    mutate(kin= ifelse(kinship>0, "kin", "nonkin")) %>% 
+    mutate(kin= factor(kin, levels= c("nonkin", "kin")))
+  # plot means and 95% CI
+  means %>% 
+    ggplot(aes(x=kin, y=mean, color= kin))+
+    geom_jitter(data= points, aes(y= y), size=2, alpha=0.5, width=0.1)+
+    geom_point(position = position_nudge(x = 0.25), size=3)+
+    geom_errorbar(aes(ymin=low, ymax=high, width=.1), position = position_nudge(x = 0.25), size=1)+
+    xlab("")+
+    ylab(label) +
+   scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
+    coord_flip()+                     
+    theme_bw()+
+    theme(legend.position= "none")
+}
+
+```
+
 
 # Visualize social networks
 
@@ -201,7 +308,8 @@ sd_gs_22 <- sd(colSums(m1_22)) #average group size
 ```
 
 ## Plot networks
-```{r plot networks 2021, message=FALSE}
+```{r plot networks, message=FALSE, out.width= "100%", out.height="100%", fig.width=12, fig.height=12}
+
 #Create adjacency data for associations (2021)
 adj_21=get_network(t(m1_21), data_format="GBI", association_index = "SRI") # the adjacency matrix
 g_21=graph_from_adjacency_matrix(adj_21, "undirected", weighted=T) #the igraph object
@@ -256,11 +364,9 @@ com_21$membership <- corrected_memberships
 
 community_assignments <- com_21$membership
 
-color_mapping <- c(
-  "female" = "slateblue",
-  "male" = "gold",
-  "unknown" = "gray"
-)
+color_mapping <- c(mako(n = 2, alpha = 0.7, begin = 0.4, end = 0.9, direction = -1), "gray")
+names(color_mapping) <- c("female", "male", "unknown")
+
 node_sex <- V(g_21)$sex
 node_colors <- sapply(node_sex, function(sex) {
   color_mapping[sex]
@@ -270,8 +376,9 @@ V(g_21)$color <- node_colors
 #Prepare to save figure 
 # png(file="./output/Association networks 2021.png",
     # width=600, height=600)
- par(oma=c(1,1,1,1), mar=c(5,4, 4, 2) + 0.8, mfrow = c(1, 2))
+ par(mfrow = c(1, 2), xpd = TRUE)
 # Iterate through com_21 and assign community names to nodes in g_21
+ set.seed(123)
 plot(
   g_21, 
   vertex.color = node_colors,  # Use the calculated node colors
@@ -282,7 +389,7 @@ plot(
 
 title(main = "2021", cex.main = 2)
 
-legend("topleft", legend = names(color_mapping), fill = color_mapping, cex = 1.5)
+legend("topleft", legend = names(color_mapping), fill = color_mapping, bty = "n", inset=c(0.66, 0.6), x.intersp = 0.2,  y.intersp = 0.55, cex = 1.1)
 
 #Create communities (2022) 
 com_22=fastgreedy.community(g_22) #community detection method
@@ -309,11 +416,6 @@ com_22$membership <- corrected_memberships
 
 community_assignments <- com_22$membership
 
-color_mapping <- c(
-  "female" = "slateblue",
-  "male" = "gold",
-  "unknown" = "gray"
-)
 node_sex <- V(g_22)$sex
 node_colors <- sapply(node_sex, function(sex) {
   color_mapping[sex]
@@ -324,6 +426,7 @@ V(g_22)$color <- node_colors
 # png(file="./output/Association networks 2022.png",width=600, height=600)
 
 # Iterate through com_21 and assign community names to nodes in g_21
+set.seed(123)
 plot(
   g_22, 
   vertex.color = node_colors,  # Use the calculated node colors
@@ -384,9 +487,11 @@ VBG_I<-(exp(VBG_I_l)-1)* exp(2*mu_l + VBG_I_l)
 NBV_I<-mu + mu^2/theta
 
 ####Repeatabilty roosting individual
+print("Repeatabilty roosting individual")
 VBR_I/(VBR_I+VBF_I+NBV_I + VBG_I)
 
 ####Repeatabilty flying individual
+print("Repeatabilty flying individual")
 VBF_I/(VBR_I+VBF_I+NBV_I)
 
 #Stats models
@@ -413,9 +518,11 @@ VBG_I<-(exp(VBG_I_l)-1)* exp(2*mu_l + VBG_I_l)
 NBV_I<-mu + mu^2/theta
 
 ####Repeatabilty roosting individual
+print("Repeatabilty roosting individual")
 VBR_I/(VBR_I+VBF_I+NBV_I)
 
 ####Repeatabilty flying individual
+print("Repeatabilty flying individual")
 VBF_I/(VBR_I+VBF_I+NBV_I)
 
 
@@ -441,9 +548,11 @@ VBG_R<-(exp(VBG_R_l)-1)* exp(2*mu_l + VBG_R_l)
 NBV_R<-mu + mu^2/theta
 
 ####Repeatabilty roosting individual
+print("Repeatabilty roosting individual")
 VBR_R/(VBR_R+VBF_R+NBV_R +VBG_R)
 
 ####Repeatabilty flying individual
+print("Repeatabilty flying individual")
 VBF_R/(VBR_R+VBF_R+NBV_R+VBG_R)
 
 
@@ -493,9 +602,11 @@ VOD_I<-VarCorr(mod_inquiry2)$ob[1,1] #Variance Overddispersion
 PV_I<-log(1/exp(fixef(mod_inquiry2)[1]) + 1)  #Variance poisson processs
 
 ####Repeatabilty roosting individual
+print("Repeatabilty roosting individual")
 VBR_I/(VBR_I+VOD_I +VBF_I+PV_I+ VBG_I)
 
 ####Repeatabilty flying individual
+print("Repeatabilty flying individual")
 VBF_I/(VBR_I+VOD_I +VBF_I+PV_I+ VBG_I)
 
 ##Model for response 
@@ -510,9 +621,11 @@ VOD_R<-VarCorr(mod_response)$ob[1,1] #Variance Overddispersion
 PV_R<-log(1/exp(fixef(mod_response)[1]) + 1) #Variance poisson processs
 
 ##Repeatabilty roosting individual
+print("Repeatabilty roosting individual")
 VBR_R/(VBR_R + VOD_R + VBF_R + PV_R + VBG_R)
 
 ##Repeatabilty flying individual
+print("Repeatabilty flying individual")
 VBF_R/(VBR_R+ VOD_R + VBF_R + PV_R + VBG_R)
 
 
@@ -528,12 +641,6 @@ VBF_R/(VBR_R+ VOD_R + VBF_R + PV_R + VBG_R)
 # Code by Gerald Carter, gcarter1640@gmail.com
 
 ### clean and wrangle data
-
-# create function to convert matrix to data-frame
-matrix_to_df <- function(m1){
-  data.frame(dyad = paste(rownames(m1)[col(m1)], colnames(m1)[row(m1)], sep="_"),
-             value = c(t(m1)), stringsAsFactors = FALSE)
-}
 
 # get kinship data
 k <- as.matrix(read.csv('./data/raw/KinshipMatrix.csv', sep= ",", row.names = 1))
@@ -772,68 +879,9 @@ write.csv(d, file = paste0('./processed/calling-association-kinship-data.csv'), 
 
 ## Explore data
 ```{r}
-# set ggplot theme
-theme_set(theme_bw(base_size = 14))
 
 # get data
 raw <- read.csv('./data/processed/calling-association-kinship-data.csv') 
-
-
-###### Create functions to estimate confindence intervals
-# function to get mean and 95% CI of values x via bootstrapping
-boot_ci <- function(x, perms=5000, bca=F) {
-  get_mean <- function(x, d) {
-    return(mean(x[d]))
-  }
-  x <- as.vector(na.omit(x))
-  mean <- mean(x)
-  if(bca){
-    boot <- boot.ci(boot(data=x, 
-                         statistic=get_mean, 
-                         R=perms, 
-                         parallel = "multicore", 
-                         ncpus = 4), 
-                    type="bca")
-    low <- boot$bca[1,4]
-    high <- boot$bca[1,5] 
-  }else{
-    boot <- boot.ci(boot(data=x, 
-                         statistic=get_mean, 
-                         R=perms, 
-                         parallel = "multicore", 
-                         ncpus = 4), 
-                    type="perc")
-    low <- boot$perc[1,4]
-    high <- boot$perc[1,5] 
-  }
-  c(low=low,mean=mean,high=high, N=round(length(x)))
-}
-
-
-# function to get mean and 95% CI via bootstrapping of values y within grouping variable x
-boot_ci2 <- function(d=d, y=d$y, x=d$x, perms=5000, bca=F){
-  df <- data.frame(effect=unique(x))
-  df$low <- NA
-  df$mean <- NA
-  df$high <- NA
-  df$n.obs <- NA
-  for (i in 1:nrow(df)) {
-    ys <- y[which(x==df$effect[i])]
-    if (length(ys)>1 & var(ys)>0 ){
-      b <- boot_ci(y[which(x==df$effect[i])], perms=perms, bca=bca) 
-      df$low[i] <- b[1]
-      df$mean[i] <- b[2]
-      df$high[i] <- b[3]
-      df$n.obs[i] <- b[4]
-    }else{
-      df$low[i] <- min(ys)
-      df$mean[i] <- mean(ys)
-      df$high[i] <- max(ys)
-      df$n.obs[i] <- length(ys)
-    }
-  }
-  df
-}
 
 # look at data
 # head(raw)
@@ -933,7 +981,7 @@ set.seed(123)
 d %>% 
   ggplot(aes(x=kinship))+
   facet_wrap(~udyad.sex, ncol=1, scales= 'free_y')+
-  geom_histogram(fill="light blue", color="black")+
+  geom_histogram(fill=viridis(10, alpha = 0.6)[3], color="black")+
   ggtitle("pairwise kinship")
 
 # # check categories
@@ -950,7 +998,7 @@ d %>%
 d %>% 
   ggplot(aes(x=sri))+
   facet_wrap(~udyad.sex, ncol=1, scale ="free_y")+
-  geom_histogram(fill="light blue", color="black")+
+  geom_histogram(fill=viridis(10, alpha = 0.6)[3], color="black")+
   xlab("association rate")+
   ggtitle("pairwise SRI values")
 # looks ok
@@ -1036,7 +1084,7 @@ k <-
     geom_errorbar(data=k, aes(ymin=low, ymax=high, width=.1), position = position_nudge(x = 0.25), size=1)+
     xlab("kinship")+
     ylab("association rate (simple ratio index)")+
-    scale_color_manual(values= c("darkgrey", "darkred"))+
+    scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
     theme(legend.position= "none", legend.title = element_blank()))
 
 # save as PDF
@@ -1059,9 +1107,9 @@ t1 <-
   d %>% 
   mutate(kinship = kinship>0.1) %>% 
   ggplot(aes(x=flight_time, y=n_response))+
-  geom_point(size=2, alpha=0.3, aes(color= kinship, shape= kinship))+ 
-  geom_smooth(method="glm.nb")+
-  scale_color_manual(values= c("darkgrey", "darkred"))+
+  geom_point(size=2, alpha=0.7, aes(color= kinship, shape= kinship))+ 
+  geom_smooth(method="glm.nb", color = mako(10)[9])+
+  scale_color_viridis_d(alpha = 1, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   xlab("flight time (seconds)")+
   ylab("response call count")+
   theme(legend.position= "none")
@@ -1071,15 +1119,17 @@ t2 <-
   d %>% 
   mutate(kinship = kinship>0.1) %>% 
   ggplot(aes(x=flight_time, y=n_inquiry))+
-  geom_point(size=2, alpha=0.3, aes(color= kinship, shape=kinship))+ 
-  geom_smooth(method = "glm.nb")+
-  scale_color_manual(values= c("darkgrey", "darkred"))+
+  geom_point(size=2, alpha=0.7, aes(color= kinship, shape=kinship))+ 
+  geom_smooth(method = "glm.nb", color = mako(10)[9])+
+ scale_color_viridis_d(alpha = 1, begin = 0.4, end = 0.9, direction = -1, option = "G") +  
   xlab("flight time (seconds)")+
   ylab("inquiry call count")+
   theme(legend.position= "none")
 
 # plot together
 t <- t1+t2
+
+t
 # ggsave(
 #   filename= "flight_time.pdf",
 #   plot = t,
@@ -1126,62 +1176,55 @@ t2
 # plot with log counts
 d %>% 
   ggplot(aes(x=log_inquiry, y=log(n_response+1)))+
-  geom_point(size=2)+ 
-  geom_smooth(method= "lm")+
+  geom_point(size=2, color = adjustcolor("black", alpha.f = 0.4))+ 
+  geom_smooth(method= "lm", color = mako(10)[9])+
   xlab("log inquiry call count")+
   ylab("log (x+1) response call count")
 
+
 # plot negative binomial curve
 # plot all bats
-(t1 <- 
-  d %>% 
+d2 <-   d %>% 
   mutate(label= "all pairs") %>% 
-  mutate(escape= as.logical(escape)) %>% 
-  ggplot(aes(x=log_inquiry, y=n_response))+
+  mutate(escape= as.logical(escape)) 
+
+(t1 <- 
+  ggplot(d2, aes(x=log_inquiry, y=n_response))+
     facet_wrap(~label)+
   geom_point(size=2, alpha=0.5)+ 
-  geom_smooth(method="glm.nb")+
+  geom_smooth(method="glm.nb", color = mako(10)[9])+
   xlab("log of inquiry call count")+
   ylab("response call count"))+
   theme(legend.position= 'none')
 
 # plot with kinship
-(t2 <- 
-  d %>% 
+d3 <-  d %>% 
   filter(!is.na(kinship)) %>% 
   mutate(escape= as.logical(escape)) %>% 
   mutate(kin= if_else(kinship>0.1, "kin", "nonkin")) %>% 
-  mutate(kin= factor(kin, levels= c("nonkin", "kin"))) %>% 
-  ggplot(aes(x=log_inquiry, y=(n_response), color=kin, group=kin))+
+  mutate(kin= factor(kin, levels= c("nonkin", "kin"))) 
+  
+
+
+d2$kin <- "all pairs"
+
+shared_cols <- intersect(names(d3),names(d2))
+
+dall <- rbind(d3[, shared_cols], d2[, shared_cols])
+
+dall$kin <- factor(dall$kin, levels = c("all pairs", "nonkin", "kin"))
+
+  t2 <- 
+ ggplot(dall, aes(x=log_inquiry, y=(n_response), color=kin, group=kin))+
   facet_wrap(~kin)+
   geom_point(size=2, alpha=0.5, aes(shape= escape))+ 
-  geom_smooth(method="glm.nb")+
+  geom_smooth(method="glm.nb", color = mako(10)[9])+
   xlab("log of inquiry call count")+
   ylab("response call count")+
-  scale_color_manual(values= c("darkgrey", "darkred"))+
-  theme(legend.position= "none")+
-  theme(axis.text.y=element_blank(),
-          axis.title.y=element_blank(),
-          legend.position="none"))
+ scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +  theme(legend.position= "none")
 
-# plot as linear model
-(t3 <- 
-    d %>% 
-  filter(!is.na(kinship)) %>% 
-  mutate(kin= if_else(kinship>0.1, "kin", "nonkin")) %>% 
-  mutate(kin= factor(kin, levels= c("nonkin", "kin"))) %>% 
-  ggplot(aes(x=log_inquiry, y=log(n_response+1), color=kin, group=kin))+
-  facet_wrap(~kin)+
-  geom_point(size=2, alpha=0.5)+ 
-  geom_smooth(method="lm")+
-  xlab("log of inquiry call count")+
-  ylab("log of response call count")+
-  scale_color_manual(values= c("darkgrey", "darkred"))+
-  theme(legend.position= "none"))
-
-(inquiry.response <- t1+t2+plot_layout(ncol = 2) + plot_layout(widths = c(1, 2)))
-
-# save as PDF
+t2
+  # save as PDF
 # ggsave(
 #   "inquiry_response.pdf",
 #   plot = inquiry.response,
@@ -1207,6 +1250,7 @@ d %>%
   mutate(kin= as.character(kinship)) %>% 
   ggplot(aes(x=kin, y=n_inquiry, group= kin))+
   geom_violin(fill=NA, width=1)+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   geom_jitter(size=2, width= 0.1, height=0, aes(color= udyad.sex))+
   xlab("kinship")+
   ylab("number of inquiry calls")+
@@ -1219,6 +1263,7 @@ d %>%
   ggplot(aes(x=kin, y=n_response, group= kin))+
   geom_violin(fill=NA, width=1)+
   geom_jitter(size=2, width= 0.1, height=0, aes(color= udyad.sex))+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   xlab("kinship")+
   ylab("number of response calls")+
   theme(legend.position= "top", legend.title = element_blank())
@@ -1229,6 +1274,7 @@ d %>%
   mutate(kin= as.character(kinship)) %>% 
   ggplot(aes(x=kin, y=resid_response, group= kin))+
   geom_violin(fill=NA, width=1)+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   geom_jitter(size=2, width= 0.1, height=0, aes(color= udyad.sex))+
   xlab("kinship")+
   ylab("residual response call variation")+
@@ -1236,42 +1282,6 @@ d %>%
 ```
 
 ```{r}
-# create function to plot variable by kinship with means and 95% CIs
-plot_kinship_effect <- function(d=d, y= d$sri, label= 'label') {
-  # plot association by kinship
-  set.seed(123)
-  means <- 
-    d %>% 
-    mutate(y=y) %>% 
-    filter(!is.na(kinship)) %>% 
-    group_by(dyad) %>% 
-    summarize(kinship= mean(kinship), y= mean(y), udyad.sex= first(udyad.sex)) %>% 
-    mutate(kin= ifelse(kinship>0, "kin", "nonkin")) %>% 
-    dplyr::select(kin, y) %>% 
-    boot_ci2(y= .$y, x=.$kin, bca=T) %>% 
-    rename(kin= effect) %>% 
-    mutate(kin= factor(kin, levels= c("nonkin", "kin")))
-  points <- 
-    d %>% 
-    mutate(y=y) %>% 
-    filter(!is.na(kinship)) %>% 
-    group_by(dyad) %>% 
-    summarize(kinship= mean(kinship), y= mean(y), udyad.sex= first(udyad.sex)) %>% 
-    mutate(kin= ifelse(kinship>0, "kin", "nonkin")) %>% 
-    mutate(kin= factor(kin, levels= c("nonkin", "kin")))
-  # plot means and 95% CI
-  means %>% 
-    ggplot(aes(x=kin, y=mean, color= kin))+
-    geom_jitter(data= points, aes(y= y), size=1, alpha=0.5, width=0.1)+
-    geom_point(position = position_nudge(x = 0.25), size=3)+
-    geom_errorbar(aes(ymin=low, ymax=high, width=.1), position = position_nudge(x = 0.25), size=1)+
-    xlab("")+
-    ylab(label) +
-    scale_color_manual(values= c("darkgrey", "darkred"))+
-    coord_flip()+                     
-    theme_bw()+
-    theme(legend.position= "none")
-}
 
 # plot effect of kinship on SRI
 (p1 <- plot_kinship_effect(d,d$sri, label= 'association (SRI)'))
@@ -1302,17 +1312,17 @@ plot_kinship_effect <- function(d=d, y= d$sri, label= 'label') {
 
 ```{r, fig.height=10}
 # plot number of inquiry calls by association and kinship (by dyad type)
-t1 <- 
+ t1 <- 
   d %>% 
   filter(!is.na(kinship)) %>% 
   mutate(kin= ifelse(kinship>0.1, "kin", "nonkin")) %>% 
   ggplot(aes(x=sri, y=log_inquiry))+
   facet_wrap(~dyad.sex, scales= "free_y")+
   geom_point(aes(color=kin), size=2, alpha=0.6)+
-  geom_smooth(method= "lm")+
+  geom_smooth(method= "lm", color = mako(10)[9])+
   xlab("association rate (simple ratio index)")+
   ylab("inquiry call count (log transformed)")+
-  scale_colour_manual(values= c("darkred", "grey"))+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   theme_bw()+
   theme(legend.position= "none", legend.title = element_blank())
 
@@ -1324,11 +1334,11 @@ t2 <-
   ggplot(aes(x=sri, y=log(n_response+1)))+
   facet_wrap(~dyad.sex, scales= "free_y")+
   geom_point(aes(color=kin), size=2, alpha=0.6)+
-  geom_smooth(method= "lm")+
+  geom_smooth(method= "lm", color = mako(10)[9])+
   xlab("association rate (simple ratio index)")+
   ylab("response call count (log transformed)")+
-  scale_colour_manual(values= c("darkred", "grey"))+
-  theme_bw()+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
+   theme_bw()+
   theme(legend.position= "none", legend.title = element_blank())
  
 # plot residual response calling by association (by dyad type)- controlling for inquiry calls
@@ -1339,11 +1349,11 @@ t3 <-
    ggplot(aes(x=sri, y=resid_response))+
    facet_wrap(~dyad.sex, scales= "free_y")+
    geom_point(aes(color=kin), size=2, alpha=0.6)+
-   geom_smooth(method= "lm")+
+   geom_smooth(method= "lm", color = mako(10)[9])+
    xlab("association rate (simple ratio index)")+
    ylab("residual response call variation")+
-   scale_colour_manual(values= c("darkred", "grey"))+
-  theme_bw()+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
+   theme_bw()+
    theme(legend.position= "none", legend.title = element_blank())
 
 # combine plots
@@ -1375,7 +1385,9 @@ t <- glmmTMB(n_response ~ kinship*sri + log_inquiry + offset(log(flight_time)) +
                family=nbinom2)
 check_overdispersion(t)
 check_zeroinflation(t, tolerance = 0.05)
+print("AIC")
 AIC(t) # 2700
+print("BIC")
 BIC(t) # 2734
 
 # fit zero-inflated NBM
@@ -1383,7 +1395,9 @@ fit <- glmmTMB(n_response ~ kinship*sri + log_inquiry + offset(log(flight_time))
                data=d,
                ziformula=~1,
                family=nbinom2)
+print("AIC")
 AIC(fit) #2649
+print("BIC")
 BIC(fit) # 2687
 summary(fit)
 
@@ -1392,7 +1406,10 @@ fit <- glmmTMB(n_response ~ kinship + sri + log_inquiry + offset(log(flight_time
                 data=d,
                 ziformula=~1,
                 family=nbinom2)
+print("AIC")
 AIC(fit) #2650
+
+print("BIC")
 BIC(fit) # 2684
 summary(fit)
 
@@ -1405,10 +1422,10 @@ d %>%
   mutate(kinship= kinship>0) %>% 
   ggplot(aes(x=n_response, y=n_response_predicted))+
     geom_point(size=2, aes(color=kinship))+
-    geom_smooth(method= "lm")+
+    geom_smooth(method= "lm", color = mako(10)[9])+
     xlab("observed count of response calls")+
   ylab("predicted count of response calls")+
-  scale_color_manual(values= c("darkgrey", "darkred"))+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   theme(legend.position= "top")
 # get relationship between predicted and observed
 summary(lm(n_response_predicted~n_response, data=d)) # r-squared= 0.46
@@ -1469,7 +1486,7 @@ plot1 <-
   geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
   geom_vline(xintercept = 0, linetype= "dashed")+
   ylab("")+
-  xlab("coefficient")+
+  xlab("Effect size")+
   coord_cartesian(xlim= c(-1.5, 1.5))+
   theme(axis.text=element_text(size=12), strip.text = element_text(size=12))
 plot1
@@ -1542,11 +1559,11 @@ d %>%
   mutate(kinship= kinship>0) %>% 
   ggplot(aes(x=n_inquiry, y=n_inquiry_predicted))+
   geom_point(size=2, aes(color=kinship))+
-  geom_smooth(method= "lm")+
+  geom_smooth(method= "lm", color = mako(10)[9])+
   xlab("observed count of inquiry calls")+
   ylab("predicted count of inquiry calls")+
-  scale_color_manual(values= c("darkgrey", "darkred"))+
-  theme(legend.position= "top")
+ scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
+   theme(legend.position= "top")
 # get relationship between predicted and observed
 summary(lm(n_inquiry_predicted~n_inquiry, data=d)) # r-squared= 0.71
 
@@ -1580,7 +1597,7 @@ plot2 <-
   geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
   geom_vline(xintercept = 0, linetype= "dashed")+
   ylab("")+
-  xlab("estimate (log odds)")+
+  xlab("Effect size (log odds)")+
   theme(axis.text=element_text(size=12), strip.text = element_text(size=12))
 plot2
 

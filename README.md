@@ -14,8 +14,10 @@ In this study we tested if disc-winged bats (_Thyroptera tricolor_) produce more
 ## Data
 * [Data](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/tree/main/data)
 
-## Analyses
+## General analyses
+* [Data analysis](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/scripts/data_analysis.html)
 
+## Estimating kinship
 * [Data analysis](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/scripts/data_analysis.html)
 
 ## Status

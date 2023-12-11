@@ -22,7 +22,7 @@ In this study we tested if disc-winged bats (_Thyroptera tricolor_) produce more
 
 ## Analyses
 
-* [Data analysis](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/scripts/data_analysis.html)
+* [Data analysis](https://rstudio-pubs-static.s3.amazonaws.com/1085969_045d0443dd024cc39c16a26ae9307385.html)
 
 ## Status
 Project is: In revision for the special theme issue "The power of sound: unravelling how acoustic communication shapes group dynamics" at Philosophical Transactions of the Royal Society B.

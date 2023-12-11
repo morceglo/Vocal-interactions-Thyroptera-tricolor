@@ -1367,15 +1367,7 @@ t3 <-
 # combine plots
 (by.sex.plot <- t1+t2+t3+plot_layout(ncol = 1)+ plot_annotation(tag_levels = 'A'))
 
-# save as PDF
-# ggsave(
-#   "by_sex_plot.pdf",
-#   plot = by.sex.plot,
-#   scale = 1,
-#   width = 7,
-#   height = 14,
-#   units = "in",
-#   dpi = 300)
+
 ```
 
 ### Effect of kinship and association on response calling
@@ -1563,9 +1555,6 @@ coefs2 <-
   mutate(type= "full model")
 # coefs2
 
-# save model results
-# write.csv(coefs2, file="inquiry_model_results.csv")
-
 # plot model results
 theme_set(theme_bw(base_size = 12))
 plot2 <- 
@@ -1650,9 +1639,6 @@ coefs2 <-
   mutate(type= "full model")
 coefs2
 
-# save model results
-write.csv(coefs2, file="inquiry_model_results_excluding_zero_responses.csv")
-
 # plot model results
 theme_set(theme_bw(base_size = 12))
 plot3 <- 
@@ -1684,15 +1670,6 @@ plot3
 # combine plots
 (plot4 <- plot2+plot3)
 
-# save as PDF
-ggsave(
-  "inquiry_model_results.pdf",
-  plot = plot4,
-  scale = 1,
-  width = 9,
-  height = 2,
-  units = "in",
-  dpi = 300)
 
 # confirm no effect with single predictors (all trials)
 # association

@@ -1638,7 +1638,7 @@ d2 %>%
   geom_smooth(method= "lm")+
   xlab("observed count of inquiry calls")+
   ylab("predicted count of inquiry calls")+
-  scale_color_manual(values= c("darkgrey", "darkred"))+
+   scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   theme(legend.position= "top")
 # get relationship between predicted and observed
 summary(lm(n_inquiry_predicted~n_inquiry, data=d2)) # r-squared= 0.81

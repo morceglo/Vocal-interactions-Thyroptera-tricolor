@@ -175,14 +175,14 @@ plot_kinship_effect <- function(d=d, y= d$sri, label= 'label') {
   # plot means and 95% CI
   means %>% 
     ggplot(aes(x=kin, y=mean, color= kin))+
-    geom_jitter(data= points, aes(y= y), size=1, alpha=0.5, width=0.1)+
+    geom_jitter(data= points, aes(y= y), size=2, alpha=0.5, width=0.1)+
     geom_point(position = position_nudge(x = 0.25), size=3)+
     geom_errorbar(aes(ymin=low, ymax=high, width=.1), position = position_nudge(x = 0.25), size=1)+
     xlab("")+
     ylab(label) +
-    scale_color_manual(values= c("darkgrey", "darkred"))+
+   scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
     coord_flip()+                     
-    theme_bw()+
+    theme_bw(base_size = 20)+
     theme(legend.position= "none")
 }
 
@@ -365,7 +365,9 @@ node_colors <- sapply(node_sex, function(sex) {
 V(g_21)$color <- node_colors
 
 #Prepare to save figure 
-png(file="./output/Association networks.png", width=1200 * 3, height=600 * 3, res = 300)
+# png(file="./output/Association networks.png", width=1200 * 3, height=600 * 3, res = 300)
+
+# pdf(file="./output/Association networks.pdf", width=1200 * 1, height=800 * 1)
  par(mfrow = c(1, 2), xpd = TRUE)
 # Iterate through com_21 and assign community names to nodes in g_21
  set.seed(123)
@@ -381,9 +383,9 @@ title(main = "2021", cex.main = 2)
 
 # legend("topleft", legend = names(color_mapping), fill = color_mapping, bty = "n", inset=c(0.66, 0.6), x.intersp = 0.2,  y.intersp = 0.55, cex = 1.1)
 
-points(x = seq(-1.12, 0.4, length.out = 3), y = rep(-1.2, 3), pch = 21, cex = 4, bg = color_mapping, col = "black")
+points(x = c(-1.12, -0.32, 0.34) + 0.2, y = rep(-1.4, 3), pch = 21, cex = 4, bg = color_mapping, col = "black")
 
-text(x = seq(-1.12, 0.4, length.out = 3) + 0.06, y = rep(-1.2, 3), labels = names(color_mapping), pos = 4, cex = 2)
+text(x = c(-1.12, -0.32, 0.34) + 0.26, y = rep(-1.4, 3), labels = names(color_mapping), pos = 4, cex = 2)
 
 #Create communities (2022) 
 com_22=fastgreedy.community(g_22) #community detection method
@@ -431,7 +433,7 @@ plot(
 
 title(main = "2022", cex.main = 2)
 
-dev.off()
+# dev.off()
 
 ```
 
@@ -1082,6 +1084,7 @@ k <-
     xlab("kinship")+
     ylab("association rate (simple ratio index)")+
     scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
+    theme_bw(base_size = 20) +
     theme(legend.position= "none", legend.title = element_blank()))
 
 # save as PDF
@@ -1115,6 +1118,7 @@ t1 <-
   scale_color_viridis_d(alpha = 1, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   xlab("flight time (seconds)")+
   ylab("response call count")+
+  theme_bw(base_size = 20) +
   theme(legend.position= "none")
 
 # plot number of inquiry calls by flight time
@@ -1127,6 +1131,7 @@ t2 <-
  scale_color_viridis_d(alpha = 1, begin = 0.4, end = 0.9, direction = -1, option = "G") +  
   xlab("flight time (seconds)")+
   ylab("inquiry call count")+
+  theme_bw(base_size = 20) +
   theme(legend.position= "none")
 
 # plot together
@@ -1228,7 +1233,9 @@ dall$kin <- factor(dall$kin, levels = c("all pairs", "nonkin", "kin"))
   geom_smooth(method="glm.nb", color = mako(10)[9])+
   xlab("log of inquiry call count")+
   ylab("response call count")+
- scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +  theme(legend.position= "none")
+ scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +  theme(legend.position= "none") +
+      theme_bw(base_size = 20) 
+
 
 t2
   # save as PDF
@@ -1433,6 +1440,7 @@ d %>%
   ylab("predicted count of response calls")+
   scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   theme(legend.position= "top")
+
 # get relationship between predicted and observed
 summary(lm(n_response_predicted~n_response, data=d)) # r-squared= 0.447
 
@@ -1461,13 +1469,14 @@ plot1 <-
                                       "kinship"))) %>% 
   mutate(term = fct_rev(term)) %>% 
   ggplot(aes(x=estimate, y=term))+
-  geom_point(size=2)+
-  geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
+  geom_point(size=3)+
+  geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1.5)+
   geom_vline(xintercept = 0, linetype= "dashed")+
   ylab("")+
   xlab("Effect size")+
-  coord_cartesian(xlim= c(-1.5, 1.5))+
-  theme(axis.text=element_text(size=12), strip.text = element_text(size=12))
+  coord_cartesian(xlim= c(-1.2, 1.2))+
+  theme(axis.text=element_text(size=12), strip.text = element_text(size=12)) +
+  theme_bw(base_size = 20)
 plot1
 
 # save as PDF
@@ -1561,9 +1570,9 @@ plot2 <-
   coefs2 %>% 
   filter(term != "(Intercept)") %>% 
   mutate(term= case_when(
-    term == 'sri' ~ "association",
-    term == 'kinship' ~ "kinship",
-    term == 'n_response' ~ "response calls")) %>% 
+    term == 'sri2' ~ "association",
+    term == 'kinship2' ~ "kinship",
+    term == 'n_response2' ~ "response calls")) %>% 
   mutate(term= factor(term, levels =c("response calls",
                                       "association", 
                                       "kinship"))) %>% 
@@ -1572,9 +1581,13 @@ plot2 <-
   geom_point(size=2)+
   geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
   geom_vline(xintercept = 0, linetype= "dashed")+
+  #coord_cartesian(xlim =c(-0.2,0.2))+
+  coord_cartesian(xlim =c(-1,1))+
   ylab("")+
-  xlab("Effect size (log odds)")+
+  xlab("coefficient")+
+  ggtitle("including trials without response calls")+
   theme(axis.text=element_text(size=12), strip.text = element_text(size=12))
+
 plot2
 
 

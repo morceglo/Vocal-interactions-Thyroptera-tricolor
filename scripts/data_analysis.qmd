@@ -1231,19 +1231,69 @@ dall$kin <- factor(dall$kin, levels = c("all pairs", "nonkin", "kin"))
   facet_wrap(~kin)+
   geom_point(size=2, alpha=0.5)+ 
   geom_smooth(method="glm.nb", color = mako(10)[9])+
-  xlab("log of inquiry call count")+
+  xlab("inquiry call count")+
   ylab("response call count")+
  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +  theme(legend.position= "none") +
       theme_bw(base_size = 20) 
 
 
 t2
-  # save as PDF
+# save as PDF
+ggsave(
+  "./output/fig_.pdf",
+  plot = t2,
+  width = 14,
+  height = 7,
+  units = "in",
+  dpi = 300)
+
+# plot all bats
+# log transform x-axis for better visualization
+(t1 <-
+  d %>%
+  mutate(label= "pairs with known kinship") %>%
+  filter(!is.na(kinship)) %>%
+  mutate(escape= as.logical(escape)) %>%
+  ggplot(aes(x=log_inquiry, y=n_response))+
+  facet_wrap(~label)+
+  geom_point(size=2, alpha=0.5, aes(shape= escape), color = mako(10)[9])+
+  geom_smooth(method="glm.nb", color = mako(10)[9])+
+  xlab("")+
+  ylab("response call count")+
+  coord_cartesian(ylim= c(0, 800))+
+      theme_bw(base_size = 20) +
+  theme(legend.position= 'none'))
+
+# plot with kinship
+(t2 <-
+  d %>%
+  filter(!is.na(kinship)) %>%
+  mutate(escape= as.logical(escape)) %>%
+  mutate(kin= if_else(kinship>0.1, "kin", "nonkin")) %>%
+  mutate(kin= factor(kin, levels= c("nonkin", "kin"))) %>%
+  ggplot(aes(x=log_inquiry, y=(n_response), color=kin, group=kin))+
+  facet_wrap(~kin)+
+  geom_point(size=2, alpha=0.5, aes(shape= escape))+
+  geom_smooth(method="glm.nb", color = mako(10)[9])+
+  xlab("log of inquiry call count                                        ")+
+  ylab("response call count")+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +     coord_cartesian(ylim= c(0, 800))+
+      theme_bw(base_size = 20) +
+  theme(legend.position= "none")+
+  theme(axis.text.y=element_blank(),
+          axis.title.y=element_blank(),
+          legend.position="none")) 
+
+
+
+(inquiry.response <- t1+t2+plot_layout(ncol = 2) + plot_layout(widths = c(1, 2)))
+
+# save as PDF
 # ggsave(
-#   "inquiry_response.pdf",
+#   "./output/fig_2_v2.pdf",
 #   plot = inquiry.response,
-#   width = 14,
-#   height = 7,
+#   width = 10,
+#   height = 5,
 #   units = "in",
 #   dpi = 300)
 

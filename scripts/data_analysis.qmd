@@ -42,15 +42,6 @@ pre.numberSource code
 </style>
 ```
 
-```{r set root directory, echo = FALSE}
-
-# set working directory as project directory or one directory above,
-rootdir <- try(rprojroot::find_rstudio_root_file(), silent = TRUE)
-if (is(rootdir, "try-error")) rootdir <-  ".."
-knitr::opts_knit$set(root.dir = rootdir)
-
-```
-
 ```{r add link to github repo, echo = FALSE, results='asis'}
 
 # print link to github repo if any
@@ -97,7 +88,6 @@ sketchy::load_packages(packages = c("igraph", "bipartite", "asnipe", "assortnet"
 # set ggplot theme
 theme_set(theme_bw(base_size = 14))
 
-###### Create functions to estimate confindence intervals
 # function to get mean and 95% CI of values x via bootstrapping
 boot_ci <- function(x, perms=5000, bca=F) {
   get_mean <- function(x, d) {
@@ -126,6 +116,7 @@ boot_ci <- function(x, perms=5000, bca=F) {
   }
   c(low=low,mean=mean,high=high, N=round(length(x)))
 }
+
 
 # function to get mean and 95% CI via bootstrapping of values y within grouping variable x
 boot_ci2 <- function(d=d, y=d$y, x=d$x, perms=5000, bca=F){
@@ -191,7 +182,7 @@ plot_kinship_effect <- function(d=d, y= d$sri, label= 'label') {
     ylab(label) +
    scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
     coord_flip()+                     
-    theme_bw()+
+    theme_bw(base_size = 20)+
     theme(legend.position= "none")
 }
 
@@ -374,8 +365,9 @@ node_colors <- sapply(node_sex, function(sex) {
 V(g_21)$color <- node_colors
 
 #Prepare to save figure 
-# png(file="./output/Association networks 2021.png",
-    # width=600, height=600)
+# png(file="./output/Association networks.png", width=1200 * 3, height=600 * 3, res = 300)
+
+# pdf(file="./output/Association networks.pdf", width=1200 * 1, height=800 * 1)
  par(mfrow = c(1, 2), xpd = TRUE)
 # Iterate through com_21 and assign community names to nodes in g_21
  set.seed(123)
@@ -389,7 +381,11 @@ plot(
 
 title(main = "2021", cex.main = 2)
 
-legend("topleft", legend = names(color_mapping), fill = color_mapping, bty = "n", inset=c(0.66, 0.6), x.intersp = 0.2,  y.intersp = 0.55, cex = 1.1)
+# legend("topleft", legend = names(color_mapping), fill = color_mapping, bty = "n", inset=c(0.66, 0.6), x.intersp = 0.2,  y.intersp = 0.55, cex = 1.1)
+
+points(x = c(-1.12, -0.32, 0.34) + 0.2, y = rep(-1.4, 3), pch = 21, cex = 4, bg = color_mapping, col = "black")
+
+text(x = c(-1.12, -0.32, 0.34) + 0.26, y = rep(-1.4, 3), labels = names(color_mapping), pos = 4, cex = 2)
 
 #Create communities (2022) 
 com_22=fastgreedy.community(g_22) #community detection method
@@ -437,8 +433,11 @@ plot(
 
 title(main = "2022", cex.main = 2)
 
+# dev.off()
 
 ```
+
+![networks](../output/Association networks.png)
 
 ## Estimate modulatity
 
@@ -1085,6 +1084,7 @@ k <-
     xlab("kinship")+
     ylab("association rate (simple ratio index)")+
     scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
+    theme_bw(base_size = 20) +
     theme(legend.position= "none", legend.title = element_blank()))
 
 # save as PDF
@@ -1101,6 +1101,12 @@ k <-
 ##### Effect of flight time on calling ----------
 
 ### How does flight time and count of inquiry calls predict count of response calls?
+# how many trials ended early
+length(d$flight_time)
+sum(d$flight_time < 300)
+sum(d$flight_time > 300)
+d %>% filter(flight_time > 300)
+
 
 # plot number of response calls by flight time
 t1 <- 
@@ -1112,6 +1118,7 @@ t1 <-
   scale_color_viridis_d(alpha = 1, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   xlab("flight time (seconds)")+
   ylab("response call count")+
+  theme_bw(base_size = 20) +
   theme(legend.position= "none")
 
 # plot number of inquiry calls by flight time
@@ -1124,6 +1131,7 @@ t2 <-
  scale_color_viridis_d(alpha = 1, begin = 0.4, end = 0.9, direction = -1, option = "G") +  
   xlab("flight time (seconds)")+
   ylab("inquiry call count")+
+  theme_bw(base_size = 20) +
   theme(legend.position= "none")
 
 # plot together
@@ -1157,11 +1165,11 @@ t2
 # for every minute of flight time, the inquiry call count increases by a factor of 1.43 [1.36, 1.49]
 
 # try poisson model for effect of flight time on response calling
-t <- glmer (n_response ~ flight_time2 + log_inquiry + (1|bat_flying) + (1|bat_roosting) + (1|group), data= d, family= poisson)
+t <- glmer (n_response ~ flight_time2 + n_inquiry + (1|bat_flying) + (1|bat_roosting) + (1|group), data= d, family= poisson)
 check_overdispersion(t)
 
 # try NBM
-t <- glmmTMB(n_response ~ flight_time2 + log_inquiry+ (1|bat_flying) + (1|bat_roosting) + (1|group),
+t <- glmmTMB(n_response ~ flight_time2 + n_inquiry+ (1|bat_flying) + (1|bat_roosting) + (1|group),
              data=d,
              ziformula=~1,             
              family=nbinom2)
@@ -1169,11 +1177,18 @@ check_overdispersion(t)
 check_zeroinflation(t)
 t2 <- tidy(t,conf.int=TRUE,exponentiate=T,effects="fixed", conf.method="profile")
 t2
-# for every minute of flight time, the response call count increases by a factor of 1.58 [1.26, 1.95]
+# for every minute of flight time, the response call count increases by a factor of 1.67 [1.34, 2.03]
 
 ##### Effect of inquiry calling on response calling------------
 
 # plot with log counts
+d %>% 
+  ggplot(aes(x=n_inquiry, y=n_response))+
+  geom_point(size=2)+ 
+  geom_smooth(method= "lm")+
+  xlab("inquiry call count")+
+  ylab("response call count")
+
 d %>% 
   ggplot(aes(x=log_inquiry, y=log(n_response+1)))+
   geom_point(size=2, color = adjustcolor("black", alpha.f = 0.4))+ 
@@ -1184,27 +1199,24 @@ d %>%
 
 # plot negative binomial curve
 # plot all bats
-d2 <-   d %>% 
+d %>% 
   mutate(label= "all pairs") %>% 
-  mutate(escape= as.logical(escape)) 
-
-(t1 <- 
-  ggplot(d2, aes(x=log_inquiry, y=n_response))+
-    facet_wrap(~label)+
+  mutate(escape= as.logical(escape)) %>% 
+  ggplot(aes(x=n_inquiry, y=n_response))+
+  facet_wrap(~label)+
   geom_point(size=2, alpha=0.5)+ 
-  geom_smooth(method="glm.nb", color = mako(10)[9])+
-  xlab("log of inquiry call count")+
-  ylab("response call count"))+
+  geom_smooth(method="glm.nb")+
+  xlab("inquiry call count")+
+  ylab("response call count")+
   theme(legend.position= 'none')
 
 # plot with kinship
-d3 <-  d %>% 
+d3 <- d %>% 
   filter(!is.na(kinship)) %>% 
   mutate(escape= as.logical(escape)) %>% 
   mutate(kin= if_else(kinship>0.1, "kin", "nonkin")) %>% 
   mutate(kin= factor(kin, levels= c("nonkin", "kin"))) 
   
-
 
 d2$kin <- "all pairs"
 
@@ -1215,21 +1227,73 @@ dall <- rbind(d3[, shared_cols], d2[, shared_cols])
 dall$kin <- factor(dall$kin, levels = c("all pairs", "nonkin", "kin"))
 
   t2 <- 
- ggplot(dall, aes(x=log_inquiry, y=(n_response), color=kin, group=kin))+
+ ggplot(dall, aes(x=n_inquiry, y=(n_response), color=kin, group=kin))+
   facet_wrap(~kin)+
-  geom_point(size=2, alpha=0.5, aes(shape= escape))+ 
+  geom_point(size=2, alpha=0.5)+ 
   geom_smooth(method="glm.nb", color = mako(10)[9])+
-  xlab("log of inquiry call count")+
+  xlab("inquiry call count")+
   ylab("response call count")+
- scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +  theme(legend.position= "none")
+ scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +  theme(legend.position= "none") +
+      theme_bw(base_size = 20) 
+
 
 t2
-  # save as PDF
+# save as PDF
+ggsave(
+  "./output/fig_.pdf",
+  plot = t2,
+  width = 14,
+  height = 7,
+  units = "in",
+  dpi = 300)
+
+# plot all bats
+# log transform x-axis for better visualization
+(t1 <-
+  d %>%
+  mutate(label= "pairs with known kinship") %>%
+  filter(!is.na(kinship)) %>%
+  mutate(escape= as.logical(escape)) %>%
+  ggplot(aes(x=log_inquiry, y=n_response))+
+  facet_wrap(~label)+
+  geom_point(size=2, alpha=0.5, aes(shape= escape), color = mako(10)[9])+
+  geom_smooth(method="glm.nb", color = mako(10)[9])+
+  xlab("")+
+  ylab("response call count")+
+  coord_cartesian(ylim= c(0, 800))+
+      theme_bw(base_size = 20) +
+  theme(legend.position= 'none'))
+
+# plot with kinship
+(t2 <-
+  d %>%
+  filter(!is.na(kinship)) %>%
+  mutate(escape= as.logical(escape)) %>%
+  mutate(kin= if_else(kinship>0.1, "kin", "nonkin")) %>%
+  mutate(kin= factor(kin, levels= c("nonkin", "kin"))) %>%
+  ggplot(aes(x=log_inquiry, y=(n_response), color=kin, group=kin))+
+  facet_wrap(~kin)+
+  geom_point(size=2, alpha=0.5, aes(shape= escape))+
+  geom_smooth(method="glm.nb", color = mako(10)[9])+
+  xlab("log of inquiry call count                                        ")+
+  ylab("response call count")+
+  scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +     coord_cartesian(ylim= c(0, 800))+
+      theme_bw(base_size = 20) +
+  theme(legend.position= "none")+
+  theme(axis.text.y=element_blank(),
+          axis.title.y=element_blank(),
+          legend.position="none")) 
+
+
+
+(inquiry.response <- t1+t2+plot_layout(ncol = 2) + plot_layout(widths = c(1, 2)))
+
+# save as PDF
 # ggsave(
-#   "inquiry_response.pdf",
+#   "./output/fig_2_v2.pdf",
 #   plot = inquiry.response,
-#   width = 14,
-#   height = 7,
+#   width = 10,
+#   height = 5,
 #   units = "in",
 #   dpi = 300)
 
@@ -1279,6 +1343,7 @@ d %>%
   xlab("kinship")+
   ylab("residual response call variation")+
   theme(legend.position= "top", legend.title = element_blank())
+
 ```
 
 ```{r}
@@ -1359,58 +1424,56 @@ t3 <-
 # combine plots
 (by.sex.plot <- t1+t2+t3+plot_layout(ncol = 1)+ plot_annotation(tag_levels = 'A'))
 
-# save as PDF
-# ggsave(
-#   "by_sex_plot.pdf",
-#   plot = by.sex.plot,
-#   scale = 1,
-#   width = 7,
-#   height = 14,
-#   units = "in",
-#   dpi = 300)
+
 ```
 
 ### Effect of kinship and association on response calling
 
 ```{r}
 
+# scale all predictors
+d$n_inquiry2 <- as.numeric(scale(d$n_inquiry))
+d$n_response2 <- as.numeric(scale(d$n_response))
+d$kinship2 <- as.numeric(scale(d$kinship))
+d$sri2 <- as.numeric(scale(d$sri))
+
 # poisson model is overdispersed
-t <- glmer(n_response ~ kinship*sri + log_inquiry + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group), family= poisson, data = d)
+t <- glmer(n_response ~ kinship2*sri2 + n_inquiry2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group), family= poisson, data = d)
 check_overdispersion(t)
 
 # fit negative binomial model (NBM)
-t <- glmmTMB(n_response ~ kinship*sri + log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+t <- glmmTMB(n_response ~ kinship2*sri2 + n_inquiry2 + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
                data=d,
                ziformula=~0,
                family=nbinom2)
 check_overdispersion(t)
 check_zeroinflation(t, tolerance = 0.05)
 print("AIC")
-AIC(t) # 2700
+AIC(t) # 2698
 print("BIC")
-BIC(t) # 2734
+BIC(t) # 2732
 
 # fit zero-inflated NBM
-fit <- glmmTMB(n_response ~ kinship*sri + log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+fit <- glmmTMB(n_response ~ kinship2*sri2 + n_inquiry2 + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
                data=d,
                ziformula=~1,
                family=nbinom2)
 print("AIC")
-AIC(fit) #2649
+AIC(fit) #2647
 print("BIC")
-BIC(fit) # 2687
+BIC(fit) # 2685
 summary(fit)
 
 # fit zero-inflated NBM without interaction
-fit <- glmmTMB(n_response ~ kinship + sri + log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+fit <- glmmTMB(n_response ~ kinship2 + sri2 + n_inquiry2 + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
                 data=d,
                 ziformula=~1,
                 family=nbinom2)
 print("AIC")
-AIC(fit) #2650
+AIC(fit) #2648
 
 print("BIC")
-BIC(fit) # 2684
+BIC(fit) # 2682
 summary(fit)
 
 # get predicted values
@@ -1427,8 +1490,9 @@ d %>%
   ylab("predicted count of response calls")+
   scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
   theme(legend.position= "top")
+
 # get relationship between predicted and observed
-summary(lm(n_response_predicted~n_response, data=d)) # r-squared= 0.46
+summary(lm(n_response_predicted~n_response, data=d)) # r-squared= 0.447
 
 # get model coefficients with 95% CIs
 coefs <- 
@@ -1441,54 +1505,28 @@ coefs <-
 # save model results
 # write.csv(coefs, file="response_model_results.csv")
 
-# effect of SRI with kin only
-fitk <- glmmTMB(n_response ~ sri+log_inquiry + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
-                data=d %>% filter(kinship>0),
-                ziformula=~1,
-                family=nbinom2)
-coefs.k <- 
-  tidy(fitk,conf.int=TRUE,exponentiate=F,effects="fixed", conf.method="profile") %>% 
-  filter(component=="cond") %>% 
-  dplyr::select(-effect, -component) %>% 
-  mutate(type= "kin only")
-# coefs.k
-
-# effect of SRI with nonkin only
-fitn <- glmmTMB(n_response ~ sri + log_inquiry + offset(log(flight_time))  + (1|bat_flying) + (1|bat_roosting) + (1|group),
-                data=d %>% filter(kinship==0),
-                ziformula=~1,
-                family=nbinom2)
-# get 95% CI
-coefs.n <- 
-  tidy(fitn,conf.int=TRUE,exponentiate=F,effects="fixed", conf.method="profile") %>% 
-  filter(component=="cond") %>% 
-  dplyr::select(-effect, -component) %>% 
-  mutate(type= "nonkin only")
-# coefs.n
-
 # plot model results
 theme_set(theme_bw(base_size = 12))
 plot1 <- 
   coefs %>% 
   filter(term != "(Intercept)") %>% 
   mutate(term= case_when(
-    term == 'sri' ~ "association",
-    term == 'kinship' ~ "kinship",
-    term == 'log_inquiry' ~ "log count of inquiry calls",
-    term == 'kinship:sri' ~ "association x kinship interaction")) %>% 
-  mutate(term= factor(term, levels =c("log count of inquiry calls",
-                                      "association x kinship interaction",
+    term == 'sri2' ~ "association",
+    term == 'kinship2' ~ "kinship",
+    term == 'n_inquiry2' ~ "inquiry calls")) %>% 
+  mutate(term= factor(term, levels =c("inquiry calls",
                                       "association", 
                                       "kinship"))) %>% 
   mutate(term = fct_rev(term)) %>% 
   ggplot(aes(x=estimate, y=term))+
-  geom_point(size=2)+
-  geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
+  geom_point(size=3)+
+  geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1.5)+
   geom_vline(xintercept = 0, linetype= "dashed")+
   ylab("")+
   xlab("Effect size")+
-  coord_cartesian(xlim= c(-1.5, 1.5))+
-  theme(axis.text=element_text(size=12), strip.text = element_text(size=12))
+  coord_cartesian(xlim= c(-1.2, 1.2))+
+  theme(axis.text=element_text(size=12), strip.text = element_text(size=12)) +
+  theme_bw(base_size = 20)
 plot1
 
 # save as PDF
@@ -1504,14 +1542,14 @@ plot1
 
 # check that sri and kinship do not predict response calls as single predictors 
 # fit zero-inflated negative binomial model with only sri
-t <- glmmTMB(n_response ~ sri + log_inquiry+ offset(log(flight_time))  + (1|bat_flying) + (1|bat_roosting) + (1|group),
+t <- glmmTMB(n_response ~ sri2 + n_inquiry2 + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
                data=d,
                ziformula=~1,
                family=nbinom2)
 summary(t)
 
 # fit zero-inflated negative binomial model with only kinship
-t <- glmmTMB(n_response ~ kinship +  log_inquiry+  offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
+t <- glmmTMB(n_response ~ kinship2 + n_inquiry2 + offset(log(flight_time)) + (1|bat_flying) + (1|bat_roosting) + (1|group),
                data=d,
                ziformula=~1,
                family=nbinom2)
@@ -1520,11 +1558,11 @@ summary(t)
 ######## Effect of kinship and association on inquiry calling---------
 
 # poisson model is overdispersed
-t <- glmer(n_inquiry ~ kinship*sri + log(n_response+1) + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group), family= poisson, data = d)
+t <- glmer(n_inquiry ~ kinship2*sri2 + n_response2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group), family= poisson, data = d)
 check_overdispersion(t)
 
 # fit negative binomial model (NBM) with log responses
-t <- glmmTMB(n_inquiry ~ kinship*sri + log(n_response+1) + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+t <- glmmTMB(n_inquiry ~ kinship2*sri2 + n_response2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
              data=d,
              ziformula=~0,
              family=nbinom2)
@@ -1533,7 +1571,7 @@ AIC(t) # 3130
 BIC(t) # 3163
 
 # fit NBM with responses
-t<- glmmTMB(n_inquiry ~ kinship*sri + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+t<- glmmTMB(n_inquiry ~ kinship2*sri2 + n_response2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
              data=d,
              ziformula=~0,
              family=nbinom2)
@@ -1576,18 +1614,15 @@ coefs2 <-
   mutate(type= "full model")
 # coefs2
 
-# save model results
-# write.csv(coefs2, file="inquiry_model_results.csv")
-
 # plot model results
 theme_set(theme_bw(base_size = 12))
 plot2 <- 
   coefs2 %>% 
   filter(term != "(Intercept)") %>% 
   mutate(term= case_when(
-    term == 'sri' ~ "association",
-    term == 'kinship' ~ "kinship",
-    term == 'n_response' ~ "response calls")) %>% 
+    term == 'sri2' ~ "association",
+    term == 'kinship2' ~ "kinship",
+    term == 'n_response2' ~ "response calls")) %>% 
   mutate(term= factor(term, levels =c("response calls",
                                       "association", 
                                       "kinship"))) %>% 
@@ -1596,21 +1631,15 @@ plot2 <-
   geom_point(size=2)+
   geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
   geom_vline(xintercept = 0, linetype= "dashed")+
+  #coord_cartesian(xlim =c(-0.2,0.2))+
+  coord_cartesian(xlim =c(-1,1))+
   ylab("")+
-  xlab("Effect size (log odds)")+
+  xlab("coefficient")+
+  ggtitle("including trials without response calls")+
   theme(axis.text=element_text(size=12), strip.text = element_text(size=12))
+
 plot2
 
-
-# save as PDF
-# ggsave(
-#   "inquiry_model_results.pdf",
-#   plot = plot1,
-#   scale = 1,
-#   width = 7,
-#   height = 3.5,
-#   units = "in",
-#   dpi = 300)
 
 # get relative amount of variance explained by random intercept
 tidy(fit2,conf.int=F,exponentiate=F) %>%
@@ -1621,21 +1650,122 @@ tidy(fit2,conf.int=F,exponentiate=F) %>%
   mutate(sum= sum(variance)) %>% 
   mutate(prop= variance/sum)
 
-# confirm no effect with single predictors
+# repeat when excluding trials with no response calls
+ d2 <- d %>% filter(n_response >0)
+
+# poisson model is overdispersed
+t <- glmer(n_inquiry ~ kinship2*sri2 + n_response2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group), family= poisson, data = d2)
+check_overdispersion(t)
+
+# fit negative binomial model (NBM) with log responses
+t <- glmmTMB(n_inquiry ~ kinship2*sri2 + n_response2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+             data=d2,
+             ziformula=~0,
+             family=nbinom2)
+check_overdispersion(t)
+AIC(t) # 1842
+BIC(t) # 1871
+summary(t)
+
+# fit NBM with responses without interaction
+fit2 <- glmmTMB(n_inquiry ~ kinship2 + sri2 + n_response2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d2,
+                ziformula=~0,
+                family=nbinom2)
+AIC(fit2) #1841
+BIC(fit2) # 1867
+summary(fit2)
+
+# get predicted values
+d2$n_inquiry_predicted <- predict(fit2, type= "response", newdata= d2, allow.new.levels = T)
+
+# plot model performance
+d2 %>% 
+  filter(!is.na(kinship)) %>% 
+  mutate(kinship= kinship>0) %>% 
+  ggplot(aes(x=n_inquiry, y=n_inquiry_predicted))+
+  geom_point(size=2, aes(color=kinship))+
+  geom_smooth(method= "lm")+
+  xlab("observed count of inquiry calls")+
+  ylab("predicted count of inquiry calls")+
+   scale_color_viridis_d(alpha = 0.8, begin = 0.4, end = 0.9, direction = -1, option = "G") +
+  theme(legend.position= "top")
+# get relationship between predicted and observed
+summary(lm(n_inquiry_predicted~n_inquiry, data=d2)) # r-squared= 0.81
+
+# get model coefficients
+summary(fit2)
+coefs2 <- 
+  tidy(fit2,conf.int=TRUE,exponentiate=F,effects="fixed", conf.method="profile") %>% 
+  filter(component=="cond") %>% 
+  dplyr::select(-effect, -component) %>% 
+  mutate(type= "full model")
+coefs2
+
+# plot model results
+theme_set(theme_bw(base_size = 12))
+plot3 <- 
+  coefs2 %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term= case_when(
+    term == 'sri2' ~ "association",
+    term == 'kinship2' ~ "kinship",
+    term == 'n_response2' ~ "response calls")) %>% 
+  mutate(term= factor(term, levels =c("response calls",
+                                      "association", 
+                                      "kinship"))) %>% 
+  mutate(term = fct_rev(term)) %>% 
+  ggplot(aes(x=estimate, y=term))+
+  geom_point(size=2)+
+  geom_errorbarh(aes(xmin=conf.low, xmax=conf.high, height=0.2), size=1)+
+  geom_vline(xintercept = 0, linetype= "dashed")+
+  ylab("")+
+  xlab("coefficient")+
+  coord_cartesian(xlim =c(-1,1))+
+  #coord_cartesian(xlim =c(-0.2,0.2))+
+  ggtitle("excluding trials without response calls")+
+  theme(axis.text=element_text(size=12), 
+        # remove y-axis labels for combining
+        axis.text.y=element_blank(),
+        strip.text = element_text(size=12))
+plot3
+
+# combine plots
+(plot4 <- plot2+plot3)
+
+
+# confirm no effect with single predictors (all trials)
 # association
-t <- glmmTMB(n_inquiry ~ sri + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+t <- glmmTMB(n_inquiry ~ sri2 + n_response2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
              data=d,
              ziformula=~0,
              family=nbinom2)
 summary(t)
 
 # kinship
-t <- glmmTMB(n_inquiry ~ kinship + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
-                data=d,
+t <- glmmTMB(n_inquiry ~ kinship2 + n_response2 + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+             data=d,
+             ziformula=~0,
+             family=nbinom2)
+summary(t)
+
+
+# confirm no effect with single predictors
+# association
+t <- glmmTMB(n_inquiry ~ sri2 + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+             data=d2,
+             ziformula=~0,
+             family=nbinom2)
+summary(t)
+
+# kinship
+t <- glmmTMB(n_inquiry ~ kinship2 + n_response + offset(log(flight_time)) +  (1|bat_flying) + (1|bat_roosting) + (1|group),
+                data=d2,
                 ziformula=~0,
                 family=nbinom2)
 summary(t)
-  
+
+max(d$n_inquiry)
 
 
 ```

@@ -12,17 +12,14 @@ Gloriana Chaverri, Maria Sagot, Jennifer L. Stynoski, Marcelo Araya-Salas, Yimen
 In this study we tested if disc-winged bats (_Thyroptera tricolor_) produce more contact calls towards more related or more associated group members.
 
 ## Data
-* [Data: associations for 2021](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/associations_2021.csv)
-* [Data: associations for 2022](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/associations_2022.csv)
-* [Data: kinship](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/KinshipMatrix.csv)
-* [Data: vocal interactions 2021](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/vocal_interactions_2021.csv)
-* [Data: vocal interactions 2022](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/vocal_interactions_2022.csv)
-* [Data: sex info 2021](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/supp_21.csv)
-* [Data: sex info 2022](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/main/supp_22.csv)
+* [Data](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/tree/main/data)
 
-## Analyses
-
+## General analyses
 * [Data analysis](https://rstudio-pubs-static.s3.amazonaws.com/1085969_045d0443dd024cc39c16a26ae9307385.html)
+
+## Estimating kinship
+* [Pipeline Markdown](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/Main/scripts/Pipeline%20GBS%20relatedness%20(Thyroptera).md)
+* [Pipeline pdf](https://github.com/morceglo/Vocal-interactions-Thyroptera-tricolor/blob/Main/scripts/Pipeline%20GBS%20relatedness%20(Thyroptera).pdf)
 
 ## Status
 Project is: In revision for the special theme issue "The power of sound: unravelling how acoustic communication shapes group dynamics" at Philosophical Transactions of the Royal Society B.
